@@ -12,7 +12,7 @@ import numpy as np
 DEFAULTS = dict(solver_iterations=100, solver_tolerance=1e-8,
                 penetration_limit=.005, contact_condim=3, torsional_friction=0., rolling_friction=0.,
                 feed_drop_height=.006, face_bearing_drag=0.,
-                face_drive_model='dynamic', face_kp=30000., face_kv=3000.,
+                face_kp=30000., face_kv=3000.,
                 face_carrier_mass=20., face_position_tol=.002, face_velocity_tol=.01)
 
 
@@ -28,8 +28,8 @@ def validate(cfg):
                 'side_belt_force_max', 'face_force_max', 'face_swing_s',
                 'jam_window', 'feed_len', 'solver_tolerance', 'penetration_limit',
                 'face_kp', 'face_kv', 'face_carrier_mass', 'face_position_tol', 'face_velocity_tol')
-    nonnegative = ('friction_belt', 'friction_steel', 'friction_block', 'ramp', 'row_gap',
-                   'row_stagger', 'jam_speed', 'torsional_friction', 'rolling_friction',
+    nonnegative = ('friction_belt', 'friction_steel', 'friction_block', 'ramp',
+                   'jam_speed', 'torsional_friction', 'rolling_friction',
                    'feed_drop_height', 'face_bearing_drag')
     for key in positive + nonnegative:
         x = c[key]
@@ -42,6 +42,8 @@ def validate(cfg):
     for key in ('count', 'solver_iterations'):
         if int(c[key]) != c[key] or c[key] < 1:
             raise ValueError('%s must be a positive integer' % key)
+    if int(c['unjam_max']) != c['unjam_max'] or c['unjam_max'] < 0:
+        raise ValueError('unjam_max must be a non-negative integer')
     if c['contact_condim'] not in (3, 4, 6):
         raise ValueError('contact_condim must be 3, 4 or 6')
     if c['torsional_friction'] and c['contact_condim'] < 4:
@@ -52,9 +54,7 @@ def validate(cfg):
         raise ValueError('solref must be >= 2*dt; changing dt must not silently change contact stiffness')
     if c['dt'] > .01 or abs(.01 / c['dt'] - round(.01 / c['dt'])) > 1e-7:
         raise ValueError('dt must divide the 10 ms controller interval exactly')
-    if c['face_drive_model'] not in ('dynamic', 'kinematic'):
-        raise ValueError('face_drive_model must be dynamic or kinematic')
-    if c['unjam'] and not 0 < abs(c['face_swing_deg']) < 90:
+    if not 0 < abs(c['face_swing_deg']) < 90:
         raise ValueError('face_swing_deg must have a nonzero magnitude below 90 degrees')
     return c
 

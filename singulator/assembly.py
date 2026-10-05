@@ -14,11 +14,8 @@ def f3(values):
 
 
 def build_xml(cfg, d, blocks):
-    # Configs archived before this revision explicitly retain the kinematic assembly when built alone.
-    dynamic_face = cfg.get('face_drive_model', 'kinematic') == 'dynamic'
     cfg = dict(DEFAULTS, **cfg)
     assets, body = [], []
-    face_actuator = ''
     for k, b in enumerate(blocks):
         assets.append('<mesh name="blk%d" vertex="%s"/>' % (k, f3(b['vertices'].ravel())))
 
@@ -79,9 +76,8 @@ def build_xml(cfg, d, blocks):
                        SIDE_BELT['pitch'] / 2 - .0005, SIDE_BELT['thickness'] / 2,
                        SIDE_BELT['height'] / 2, f3(shade)))
 
-    # One bent plate: diagonal face, then straight as the lane's outer wall. Two flat skirts.
-    # With --face-shape curve the diagonal is a polyline of boxes; with the swing unjam the whole
-    # face (the single box or the whole polyline) is one hinged body instead of static geoms.
+    # The face (a row of free vertical rollers, or a polyline of plate boxes) is one body hinged at the bend;
+    # the lane's outer wall continues straight from there. Two flat skirts.
     lane_a = (np.array(d['P1'], float) if d['lane_out_start'] <= d['P1'][0] + 1e-12   # a window only if the face needs one
               else np.array([d['lane_out_start'], d['lane_top'], 0.]))
     lane_b = np.array([d['belt_x1'], d['lane_top'], 0.])
@@ -102,15 +98,12 @@ def build_xml(cfg, d, blocks):
                    m * (3 * R * R + h * h) / 12, m * (3 * R * R + h * h) / 12, m * R * R / 2,
                    R, h / 2, '.80 .82 .86 1' if i % 2 else '.62 .66 .72 1'))
 
-    if cfg['unjam']:
-        piv = d['P0'] if cfg['face_hinge'] == 'upstream' else d['P1']
-        segs = (list(zip(d['face_pts'][:-1], d['face_pts'][1:])) if d['face_pts'] is not None
-                else [(d['P0'], d['P1'])])
+    piv = d['P1']
+    if fr:                                    # rollers ride on the swinging face: nested bodies
+        fgeoms = [roller_xml(nm, c[0] - piv[0], c[1] - piv[1], zc, i) for i, (nm, c, zc) in enumerate(fr)]
+    else:                                     # --face-kind plate: one box per segment of the polyline
         fgeoms = []
-        if fr:                                # rollers ride on the swinging face: nested bodies
-            segs = []
-            fgeoms = [roller_xml(nm, c[0] - piv[0], c[1] - piv[1], zc, i) for i, (nm, c, zc) in enumerate(fr)]
-        for i, (A, Bp) in enumerate(segs):
+        for i, (A, Bp) in enumerate(zip(d['face_pts'][:-1], d['face_pts'][1:])):
             mid = (A + Bp) / 2
             ln = float(np.linalg.norm(Bp - A))
             ang = math.atan2(Bp[1] - A[1], Bp[0] - A[0])
@@ -119,57 +112,41 @@ def build_xml(cfg, d, blocks):
             fgeoms.append('<geom name="plough%d" class="wall" type="box" size="%.4f %.4f %.4f" pos="%.4f %.4f %.4f" euler="0 0 %.6f" rgba=".78 .45 .25 1"/>'
                           % (i, ln / 2, PLOUGH['thickness'] / 2, PLOUGH['height'] / 2,
                              c[0] - piv[0], c[1] - piv[1], PLOUGH['bottom_gap'] + PLOUGH['height'] / 2, ang))
-        # child bodies (the rollers) come after the geoms, which is the order MJCF expects
-        joint_xml = '<joint name="facej" type="hinge" axis="0 0 1" armature="100000"/>'
-        inertial_xml = '<inertial pos="0 0 0" mass="20" diaginertia="1 1 1"/>'
-        if dynamic_face:
-            delta = math.radians(cfg['face_swing_deg'])
-            lo, hi = min(0., delta), max(0., delta)
-            joint_xml = (f'<joint name="facej" type="hinge" axis="0 0 1" limited="true" '
-                         f'range="{lo} {hi}" damping="10" solreflimit="{cfg["solref"]} {cfg["dampratio"]}"/>')
-            # Approximate carrier as a uniform rectangular beam along the chord. Rollers retain their
-            # own masses/inertias. Neither the 20 kg carrier nor servo gains are equipment measurements.
-            chord = d['P1'] - d['P0']
-            length = float(np.linalg.norm(chord))
-            mid = (d['P0'] + d['P1']) / 2 - piv
-            mass, thick, height = cfg['face_carrier_mass'], PLOUGH['thickness'], PLOUGH['height']
-            iz = mass * (length ** 2 + thick ** 2) / 12
-            inertial_xml = (f'<inertial pos="{mid[0]} {mid[1]} {height/2}" mass="{mass}" '
-                            f'quat="{math.cos(math.atan2(chord[1], chord[0])/2)} 0 0 '
-                            f'{math.sin(math.atan2(chord[1], chord[0])/2)}" '
-                            f'diaginertia="{mass*(thick**2+height**2)/12} '
-                            f'{mass*(length**2+height**2)/12} {iz}"/>')
-            torque = cfg['face_force_max'] * length
-            face_actuator = (f'<position name="face_drive" joint="facej" kp="{cfg["face_kp"]}" '
-                             f'kv="{cfg["face_kv"]}" ctrllimited="true" ctrlrange="{lo} {hi}" '
-                             f'forcelimited="true" forcerange="{-torque} {torque}"/>')
-        body.append('<body name="face" pos="%.4f %.4f 0">%s%s'
-                    '<geom type="cylinder" size=".03 .22" pos="0 0 .22" contype="0" conaffinity="0" rgba=".2 .2 .2 1"/>'
-                    '%s</body>'
-                    % (piv[0], piv[1], joint_xml, inertial_xml, ''.join(fgeoms)))
-        wall_edges = [('lane_out', lane_a, lane_b)]
-    else:
-        if fr:                                # static roller face: free bodies at fixed positions
-            body += [roller_xml(nm, c[0], c[1], zc, i) for i, (nm, c, zc) in enumerate(fr)]
-            wall_edges = []
-        else:
-            wall_edges = ([('plough%d' % i, A, Bp) for i, (A, Bp) in enumerate(zip(d['face_pts'][:-1], d['face_pts'][1:]))]
-                          if d['face_pts'] is not None else [('plough', d['P0'], d['P1'])])
-        wall_edges.append(('lane_out', lane_a, lane_b))
-    for tag, A, Bp in wall_edges:
-        mid = (A + Bp) / 2
-        ln = float(np.linalg.norm(Bp - A))
-        if ln < .001:
-            # only a degenerate edge (a lane_out wall of zero length when the bend sits at the belt end)
-            # is dropped. The threshold used to be 0.05 m, which silently deleted 19 of the 24 boxes of a
-            # STATIC curved face -- every segment steeper than ~27 deg -- leaving a 0.8 m hole in the
-            # plough for any curve run that is not the hinged swing body (--no-unjam / --unjam-mode pulse)
-            continue
-        ang = math.atan2(Bp[1] - A[1], Bp[0] - A[0])
+    # the hinge: a finite-torque position servo against soft joint stops
+    delta = math.radians(cfg['face_swing_deg'])
+    lo, hi = min(0., delta), max(0., delta)
+    joint_xml = (f'<joint name="facej" type="hinge" axis="0 0 1" limited="true" '
+                 f'range="{lo} {hi}" damping="10" solreflimit="{cfg["solref"]} {cfg["dampratio"]}"/>')
+    # Approximate carrier as a uniform rectangular beam along the chord. Rollers retain their
+    # own masses/inertias. Neither the 20 kg carrier nor servo gains are equipment measurements.
+    chord = d['P1'] - d['P0']
+    length = float(np.linalg.norm(chord))
+    mid = (d['P0'] + d['P1']) / 2 - piv
+    mass, thick, height = cfg['face_carrier_mass'], PLOUGH['thickness'], PLOUGH['height']
+    iz = mass * (length ** 2 + thick ** 2) / 12
+    inertial_xml = (f'<inertial pos="{mid[0]} {mid[1]} {height/2}" mass="{mass}" '
+                    f'quat="{math.cos(math.atan2(chord[1], chord[0])/2)} 0 0 '
+                    f'{math.sin(math.atan2(chord[1], chord[0])/2)}" '
+                    f'diaginertia="{mass*(thick**2+height**2)/12} '
+                    f'{mass*(length**2+height**2)/12} {iz}"/>')
+    torque = cfg['face_force_max'] * length
+    face_actuator = (f'<position name="face_drive" joint="facej" kp="{cfg["face_kp"]}" '
+                     f'kv="{cfg["face_kv"]}" ctrllimited="true" ctrlrange="{lo} {hi}" '
+                     f'forcelimited="true" forcerange="{-torque} {torque}"/>')
+    # child bodies (the rollers) come after the geoms, which is the order MJCF expects
+    body.append('<body name="face" pos="%.4f %.4f 0">%s%s'
+                '<geom type="cylinder" size=".03 .22" pos="0 0 .22" contype="0" conaffinity="0" rgba=".2 .2 .2 1"/>'
+                '%s</body>'
+                % (piv[0], piv[1], joint_xml, inertial_xml, ''.join(fgeoms)))
+    # the lane's outer wall; a wall of zero length (the bend at the belt end) is dropped
+    ln = float(np.linalg.norm(lane_b - lane_a))
+    if ln >= .001:
+        mid = (lane_a + lane_b) / 2
+        ang = math.atan2(lane_b[1] - lane_a[1], lane_b[0] - lane_a[0])
         off = np.array([-math.sin(ang), math.cos(ang), 0.]) * PLOUGH['thickness'] / 2
         c = mid + off
-        static.append('<geom name="%s" class="wall" type="box" size="%.4f %.4f %.4f" pos="%.4f %.4f %.4f" euler="0 0 %.6f" rgba=".62 .5 .38 1"/>'
-                      % (tag, ln / 2, PLOUGH['thickness'] / 2, PLOUGH['height'] / 2,
+        static.append('<geom name="lane_out" class="wall" type="box" size="%.4f %.4f %.4f" pos="%.4f %.4f %.4f" euler="0 0 %.6f" rgba=".62 .5 .38 1"/>'
+                      % (ln / 2, PLOUGH['thickness'] / 2, PLOUGH['height'] / 2,
                          c[0], c[1], PLOUGH['bottom_gap'] + PLOUGH['height'] / 2, ang))
     skirts = [('skirt_out', cfg['belt_w'] + SKIRT['thickness'] / 2, d['belt_x0'], d['skirt_out_end'], .004),
               ('skirt_in', cfg['lane_y'] - SKIRT['thickness'] / 2, d['belt_x0'],
@@ -249,7 +226,7 @@ def build_xml(cfg, d, blocks):
     xml = xml.replace('.005 .0001"', f'{cfg["torsional_friction"]} {cfg["rolling_friction"]}"')
     if sep_equality:
         xml = xml.replace('</mujoco>', '<equality>' + sep_equality + '</equality></mujoco>')
-    return xml.replace('</mujoco>', '<actuator>' + actuators + '</actuator></mujoco>') if actuators else xml
+    return xml.replace('</mujoco>', '<actuator>' + actuators + '</actuator></mujoco>')
 
 
 def motion_clearance(cfg, d, steps=26):
@@ -282,14 +259,9 @@ def motion_clearance(cfg, d, steps=26):
                 p = model.body_parentid[p]
         return [g for g in collidable if model.geom_bodyid[g] in bodies]
 
-    moves = []                                  # (mechanism, its geoms, its joint, stroke positions)
-    if cfg['unjam']:
-        moves.append(('face', subtree(model.body('face').id), model.jnt_qposadr[model.joint('facej').id],
-                      np.radians(np.linspace(0., cfg['face_swing_deg'], steps))))
-    elif cfg['face_kind'] == 'rollers':
-        rollers = [g for g in collidable if (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY,
-                                                               model.geom_bodyid[g]) or '').startswith('fr')]
-        moves.append(('face_rollers', rollers, None, [0.]))
+    # (mechanism, its geoms, its joint, stroke positions)
+    moves = [('face', subtree(model.body('face').id), model.jnt_qposadr[model.joint('facej').id],
+              np.radians(np.linspace(0., cfg['face_swing_deg'], steps)))]
     # the separator plate and linkage over the whole stroke (degrees), posed through the closed loop
     c = d['station']['sep']
     moves.append(('separator', subtree(model.body(separator.PREFIX + 'plate').id)
@@ -301,7 +273,7 @@ def motion_clearance(cfg, d, steps=26):
         data.qpos[chain_q] = chain_x
         if callable(q):
             q(p)
-        elif q is not None:
+        else:
             data.qpos[q] = p
         mujoco.mj_forward(model, data)
 
@@ -340,7 +312,7 @@ def motion_clearance(cfg, d, steps=26):
                         best = (dist, (name(ga), name(gb)), float(p))
             for ga, gb in retry:        # re-measure just either side of the degenerate pose (finer than the sweep step)
                 vals = []
-                for e in ((1e-3, 5e-3, 1e-2) if q is not None else ()):
+                for e in (1e-3, 5e-3, 1e-2):
                     for sgn in (-1, 1):
                         pose(q, p + sgn * e)
                         vals.append(distance(ga, gb))

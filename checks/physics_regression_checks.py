@@ -27,26 +27,25 @@ class PhysicsChecks(unittest.TestCase):
         return d, m, data
 
     def test_layout_clears_actual_low_wall(self):
-        for mode in ('scatter', 'rows'):
-            cfg = self.cfg('--layout', mode)
-            d = machine.derive(cfg)
-            for seed in range(100):
-                rng = np.random.default_rng(seed)
-                b = lumps.make_blocks(cfg, rng)
-                layout, _, _ = getattr(lumps, 'plan_' + mode)(cfg, b, rng, d)
-                for k, x, y, z, yaw in layout:
-                    fp = lumps.footprint(b[k]['vertices'], yaw)
-                    self.assertGreaterEqual(y + fp[2], cfg['lane_y'] + .005 - 1e-12)
+        cfg = self.cfg()
+        d = machine.derive(cfg)
+        for seed in range(100):
+            rng = np.random.default_rng(seed)
+            b = lumps.make_blocks(cfg, rng)
+            layout, _, _ = lumps.plan_scatter(cfg, b, rng, d)
+            for k, x, y, z, yaw in layout:
+                fp = lumps.footprint(b[k]['vertices'], yaw)
+                self.assertGreaterEqual(y + fp[2], cfg['lane_y'] + .005 - 1e-12)
 
     def test_invalid_inputs_fail_before_build(self):
         for args in (('--dt', '0'), ('--dt', '0.0006'), ('--v-belt', 'nan'), ('--count', '0'),
-                     ('--gangue-fraction', '1.1'), ('--size-long-max', '.4'),
-                     ('--rolling-friction', '.001'), ('--solref', '.0001')):
+                     ('--gangue-fraction', '1.1'), ('--size-long-max', '.4'), ('--unjam-max', '-1'),
+                     ('--rolling-friction', '.001'), ('--solref', '.0001'), ('--face-swing-deg', '0')):
             with self.assertRaises(ValueError, msg=str(args)):
                 self.cfg(*args)
 
     def test_brake_holds_only_within_capacity(self):
-        m = drives.make_motor(True, 100., 100., 1., .05)
+        m = drives.make_motor(100., 100., 1., .05)
         drives.brake_update(m, 90., .01)
         self.assertEqual(m['f'], 0.)
         drives.brake_update(m, 200., .01)
@@ -62,8 +61,7 @@ class PhysicsChecks(unittest.TestCase):
     def test_sliding_cube_coulomb_impulse_and_reaction(self):
         vertices = np.array([[x,y,z] for x in (-.05,.05) for y in (-.05,.05) for z in (-.05,.05)])
         for dt in (.0005, .00025):
-            cfg = self.cfg('--no-unjam',
-                           '--friction-belt', '.4', '--dt', str(dt))
+            cfg = self.cfg('--friction-belt', '.4', '--dt', str(dt))
             d, m, data = self.build(cfg, [dict(vertices=vertices, material='coal', density=1300.)])
             belt = drives.Conveyors(cfg, d, m)
             j = m.joint('bj0').id
@@ -92,7 +90,7 @@ class PhysicsChecks(unittest.TestCase):
         d, m, data = self.build(cfg)
         j, a = m.joint('facej').id, m.actuator('face_drive').id
         q, v = int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])
-        f = face.FaceRetract(cfg, d, cfg['dt'], (q, v), actuator=a)
+        f = face.FaceRetract(cfg, face.FaceServo(cfg, d, cfg['dt'], (q, v), a))
         self.assertEqual(m.dof_armature[v], 0.)
         f.start(0.)
         before = data.qpos.copy()
@@ -116,8 +114,8 @@ class PhysicsChecks(unittest.TestCase):
         cfg = self.cfg()
         d, m, data = self.build(cfg)
         j = m.joint('facej').id
-        f = face.FaceRetract(cfg, d, cfg['dt'], (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])),
-                             actuator=m.actuator('face_drive').id)
+        f = face.FaceRetract(cfg, face.FaceServo(cfg, d, cfg['dt'], (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])),
+                                                 m.actuator('face_drive').id))
         f.zone_busy = False
         f.start(0.)
         for _ in range(round(8/cfg['dt'])):

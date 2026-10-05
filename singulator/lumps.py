@@ -40,18 +40,13 @@ GANGUE_MASS_RANGE = {'coal': (0., .10), 'middlings': (.10, .80), 'gangue': (.80,
 
 
 def validate_material(cfg):
-    model = cfg.get('material_model', 'legacy_binary')
-    if model not in ('composition', 'legacy_binary'):
-        raise ValueError('unknown material_model: %s' % model)
-    if model == 'composition':
-        gangue, middlings = cfg['gangue_fraction'], cfg.get('middlings_fraction', .25)
-        if not all(math.isfinite(x) and 0 <= x <= 1 for x in (gangue, middlings)) or gangue + middlings > 1:
-            raise ValueError('gangue_fraction and middlings_fraction must be in [0, 1] and sum <= 1')
-        for name in ('coal', 'gangue'):
-            lo = cfg.get(name + '_density_min', DENSITY_RANGE[name][0])
-            hi = cfg.get(name + '_density_max', DENSITY_RANGE[name][1])
-            if not (math.isfinite(lo) and math.isfinite(hi) and 0 < lo <= hi):
-                raise ValueError('%s density bounds must be finite, positive and ordered' % name)
+    gangue, middlings = cfg['gangue_fraction'], cfg['middlings_fraction']
+    if not all(math.isfinite(x) and 0 <= x <= 1 for x in (gangue, middlings)) or gangue + middlings > 1:
+        raise ValueError('gangue_fraction and middlings_fraction must be in [0, 1] and sum <= 1')
+    for name in ('coal', 'gangue'):
+        lo, hi = cfg[name + '_density_min'], cfg[name + '_density_max']
+        if not (math.isfinite(lo) and math.isfinite(hi) and 0 < lo <= hi):
+            raise ValueError('%s density bounds must be finite, positive and ordered' % name)
 
 
 def sample_composition(cfg, rng):
@@ -61,13 +56,12 @@ def sample_composition(cfg, rng):
     Their internal porosity/impurities are implicit in their effective particle densities.
     No extra pore space, water, chemical assay or resolved internal layers are claimed.
     """
-    g, mid = cfg['gangue_fraction'], cfg.get('middlings_fraction', .25)
+    g, mid = cfg['gangue_fraction'], cfg['middlings_fraction']
     material = str(rng.choice(['coal', 'middlings', 'gangue'], p=[max(0., 1 - g - mid), mid, g]))
     wg = float(rng.uniform(*GANGUE_MASS_RANGE[material]))
     fractions = dict(coal=1 - wg, gangue=wg)
-    densities = {name: float(rng.uniform(cfg.get(name + '_density_min', limits[0]),
-                                        cfg.get(name + '_density_max', limits[1])))
-                 for name, limits in DENSITY_RANGE.items()}
+    densities = {name: float(rng.uniform(cfg[name + '_density_min'], cfg[name + '_density_max']))
+                 for name in DENSITY_RANGE}
     # Additive component volumes: MASS fractions require a harmonic, not arithmetic mean.
     specific_volume = {name: fractions[name] / densities[name] for name in fractions}
     density = 1 / sum(specific_volume.values())
@@ -94,18 +88,13 @@ def batch_material_summary(blocks):
     mass = sum(b['mass_kg'] for b in blocks)
     volume = sum(b['volume_m3'] for b in blocks)
     counts = {name: sum(b['material'] == name for b in blocks) for name in ('coal', 'middlings', 'gangue')}
-    out = dict(total_mass_kg=mass, total_weight_N=mass * 9.81, particle_volume_m3=volume,
-               effective_particle_density_kg_m3=mass / volume,
-               category_counts=counts, category_count_fractions={k: v / len(blocks) for k, v in counts.items()},
-               calibrated=False)
-    if all('composition' in b for b in blocks):
-        components = {name: sum(b['composition']['component_mass_kg'][name] for b in blocks)
-                      for name in ('coal', 'gangue')}
-        out.update(material_model=COMPOSITION_MODEL, basis='dry_endmember_mass',
-                   component_mass_kg=components, mass_fractions={k: v / mass for k, v in components.items()})
-    else:
-        out['material_model'] = 'legacy_binary'
-    return out
+    components = {name: sum(b['composition']['component_mass_kg'][name] for b in blocks)
+                  for name in ('coal', 'gangue')}
+    return dict(total_mass_kg=mass, total_weight_N=mass * 9.81, particle_volume_m3=volume,
+                effective_particle_density_kg_m3=mass / volume,
+                category_counts=counts, category_count_fractions={k: v / len(blocks) for k, v in counts.items()},
+                calibrated=False, material_model=COMPOSITION_MODEL, basis='dry_endmember_mass',
+                component_mass_kg=components, mass_fractions={k: v / mass for k, v in components.items()})
 
 # Sliding friction by contact pair: inherited, uncalibrated assumptions. No material-dependent
 # sampling or measured static/kinetic distinction is currently justified.
@@ -120,11 +109,6 @@ def sample_family(rng):
     names = list(FAMILIES)
     w = np.array([FAMILIES[n]['weight'] for n in names])
     return str(rng.choice(names, p=w / w.sum()))
-
-
-def sample_density(rng, material):
-    lo, hi = DENSITY_RANGE[material]
-    return float(rng.uniform(lo, hi))
 
 
 def make_block(rng, family, size, long_max=None):
@@ -178,24 +162,30 @@ def block_world_vertices(data, b):
 
 
 def make_blocks(cfg, rng):
+    """The batch: shapes from the main stream `rng` (which the layout goes on drawing from), materials from a
+    stream of their own.
+
+    Two draws per lump are made and thrown away -- the category and the density of the two-category sampler
+    this model replaced on 2026-09-24. They keep the main stream where it was: the same seed gives the same
+    shapes and the same layout as every batch run since, which is what makes seeds comparable across
+    EXPERIMENTS.md (checks/material_checks.py pins it).
+    """
     validate_material(cfg)
     blocks = []
     for _ in range(cfg['count']):
         fam = sample_family(rng)
-        if cfg.get('layout') == 'flat':
+        if cfg['layout'] == 'flat':
             fam = 'flat'                        # bench layout 扁平: the same draws, every lump tabular
-        mat = 'gangue' if rng.random() < cfg['gangue_fraction'] else 'coal'
+        binary = 'gangue' if rng.random() < cfg['gangue_fraction'] else 'coal'    # stream compatibility, unused
         size = rng.uniform(cfg['size_min'], cfg['size_max'])
-        blocks.append(dict(make_block(rng, fam, size, cfg['size_long_max']), material=mat,
-                           density=sample_density(rng, mat)))
-    if cfg.get('material_model', 'legacy_binary') == 'composition':
-        # Derive a separate stream without consuming the layout stream (or reusing its draws).
-        # Preserve old vertices and subsequent layout for the same seed and gangue_fraction.
-        seed = hashlib.sha256(repr(rng.bit_generator.state).encode('utf-8')).digest()
-        material_rng = np.random.default_rng(np.frombuffer(seed, dtype='<u4'))
-        for block in blocks:
-            block.update(sample_composition(cfg, material_rng))
+        block = make_block(rng, fam, size, cfg['size_long_max'])
+        rng.uniform(*DENSITY_RANGE[binary])                                       # stream compatibility, unused
+        blocks.append(block)
+    # A separate stream, derived from the main one without consuming it (or reusing its draws).
+    seed = hashlib.sha256(repr(rng.bit_generator.state).encode('utf-8')).digest()
+    material_rng = np.random.default_rng(np.frombuffer(seed, dtype='<u4'))
     for block in blocks:
+        block.update(sample_composition(cfg, material_rng))
         set_mass_properties(block)
     return blocks
 
@@ -239,12 +229,11 @@ def plan_scatter(cfg, blocks, rng, d):
     point. Lumps are dropped at random (x, y, yaw) inside a patch and kept only if their plan-view
     hulls do not overlap, so the layer is single-height by construction and lumps may touch.
 
-    plan_rows instead lays the batch out in tidy rows with 0.02 m side gaps and 0.10 m row gaps, which
-    hands the machine a regular input it will not see in service. The patch grows until the batch fits,
-    so a dense batch stays dense rather than being silently spread out.
+    The batch is spread over the whole belt width: the lumps that start below lane_top ride into the lane
+    without meeting the face. The patch grows until the batch fits, so a dense batch stays dense rather than
+    being silently spread out.
     """
-    y_lo = d['lane_top'] + .01 if cfg['feed_band'] == 'plough' else max(.03, cfg['lane_y'] + .005)
-    y_hi = cfg['belt_w'] - .01 if cfg['feed_band'] == 'plough' else cfg['belt_w'] - .03
+    y_lo, y_hi = max(.03, cfg['lane_y'] + .005), cfg['belt_w'] - .03
     length = cfg['feed_len']
     order = list(range(len(blocks)))
     rng.shuffle(order)
@@ -264,7 +253,7 @@ def plan_scatter(cfg, blocks, rng, d):
                     continue
                 hulls.append(hh)
                 fp = footprint(blocks[k]['vertices'], yaw)
-                placed.append((k, x, y, cfg.get('feed_drop_height', .006) - fp[4], yaw))
+                placed.append((k, x, y, cfg['feed_drop_height'] - fp[4], yaw))
                 break
             else:
                 break
@@ -274,51 +263,3 @@ def plan_scatter(cfg, blocks, rng, d):
     else:
         raise RuntimeError('could not lay %d lumps out in one layer' % len(blocks))
     return _shift_to_start(cfg, blocks, d, placed, 'feed patch')
-
-
-def plan_rows(cfg, blocks, rng, d):
-    """De-stacked layer of side-by-side rows across the belt: the abreast input the S tests used.
-
-    Rows are built back from the plough, so the whole layer sits clear of the face at t = 0 whatever
-    its depth turns out to be; the belt then carries it in.
-
-    --feed-band plough confines the layer to the band the face can actually reach (y above lane_top).
-    The face only ever pushes material DOWN, so a lump placed above lane_top is guaranteed to meet it;
-    a lump placed below is already in the lane band and rides through untouched -- which is what the
-    old full-belt layer did to 318 of 600 lumps in the 100-condition screening (53 %). Do NOT try to
-    enforce the band with a guide wall on the belt instead: a wall along y = lane_top closes a wedge
-    between itself and the face (0.55 m -> 0) whose apex has no outlet, and the pilot arches solid.
-    """
-    y_lo = d['lane_top'] + .01 if cfg['feed_band'] == 'plough' else max(.03, cfg['lane_y'] + .005)
-    y_hi = cfg['belt_w'] - .01 if cfg['feed_band'] == 'plough' else cfg['belt_w'] - .03
-    band = y_hi - y_lo
-    placed, x_rear, order = [], 0., list(range(len(blocks)))
-    rng.shuffle(order)
-    i = 0
-    while i < len(order):
-        row, used = [], 0.
-        while i < len(order) and len(row) < 3:
-            k = order[i]
-            for attempt in range(60):
-                yaw = rng.uniform(-math.pi, math.pi) if attempt < 40 else rng.uniform(-.08, .08)
-                fp = footprint(blocks[k]['vertices'], yaw)
-                w = fp[3] - fp[2]
-                if used + w + .02 * len(row) <= band:
-                    row.append((k, yaw, w, fp))
-                    used += w
-                    break
-            else:
-                break
-            i += 1
-        if not row:
-            raise RuntimeError('nothing fits across the belt')
-        free = band - used - .02 * (len(row) - 1)
-        y = y_lo + rng.uniform(0., max(free, 0.))
-        depth = 0.
-        for j, (k, yaw, w, fp) in enumerate(row):
-            dx = rng.uniform(0., cfg['row_stagger'])
-            placed.append((k, x_rear + dx - fp[0], y - fp[2], cfg.get('feed_drop_height', .006) - fp[4], yaw))
-            depth = max(depth, fp[1] - fp[0] + dx)
-            y += w + .02
-        x_rear += depth + cfg['row_gap']
-    return _shift_to_start(cfg, blocks, d, placed, 'feed layer')

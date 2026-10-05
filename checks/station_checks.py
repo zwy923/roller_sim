@@ -248,24 +248,18 @@ class Tracker(unittest.TestCase):
         counted as 13 after 19 s (scatter 7001), and the station held it -- a single lump void."""
         lump = box(-1.5, -1.1, D['feeder']['step_m'], D['feeder']['step_m'] + .30, y0=.3, y1=.7)   # on the feed belt
 
-        def count(ghost_s):
-            keep, perception.GHOST_S = perception.GHOST_S, ghost_s
-            try:
-                v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
-                for i in range(3):
-                    v.frame(i * .01, {0: lump}, lambda a, b: 1.)
-                (tr,) = v.tracks.values()
-                v.tracks[99] = dict(tr, tid=99, lineage=frozenset({99}), count=2, seen=-.01,
-                                    hist=[(-.01, tr['m']['cx'], tr['m']['cy'])])
-                v.next_tid = 100
-                fr = v.frame(.03, {0: lump}, lambda a, b: 1.)
-                (merged,) = v.tracks.values()
-                self.assertEqual((v.counts['merges'], merged['lineage'] >= {99}), (1, True))
-                return merged['count']
-            finally:
-                perception.GHOST_S = keep
-        self.assertEqual(count(perception.GHOST_S), 1)              # the ghost is absorbed: still one lump
-        self.assertEqual(count(None), 3)                            # as before: its own 1 + the ghost's 2
+        v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
+        for i in range(3):
+            v.frame(i * .01, {0: lump}, lambda a, b: 1.)
+        (tr,) = v.tracks.values()
+        v.tracks[99] = dict(tr, tid=99, lineage=frozenset({99}), count=2, seen=-.01,
+                            hist=[(-.01, tr['m']['cx'], tr['m']['cy'])])
+        v.next_tid = 100
+        v.frame(.03, {0: lump}, lambda a, b: 1.)
+        (merged,) = v.tracks.values()
+        self.assertEqual((v.counts['merges'], merged['lineage'] >= {99}), (1, True))
+        self.assertEqual(merged['count'], 1)                        # the ghost is absorbed: still one lump (its
+                                                                    # count of 2 was added until 2026-10-04: 3)
 
     def test_the_pieces_of_a_blob_that_comes_apart_keep_its_lineage(self):
         """Two lumps in a row are one blob; its outline centroid lies between them, more than MATCH_GATE from
@@ -275,24 +269,14 @@ class Tracker(unittest.TestCase):
         z = D['feeder']['step_m']
         lump = lambda x: box(x, x + .50, z, z + .30, y0=.3, y1=.7)     # on the feed belt, 0.50 m long
 
-        def part(pad):
-            keep, perception.SPLIT_PAD = perception.SPLIT_PAD, pad
-            try:
-                v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
-                for i in range(3):
-                    v.frame(i * .01, {0: lump(-1.5), 1: lump(-2.)}, lambda a, b: 0.)        # touching: one blob
-                (blob,) = v.tracks
-                v.frame(.03, {0: lump(-1.44), 1: lump(-2.06)}, lambda a, b: .12)            # 12 cm apart
-                pieces = [tr for tr in v.tracks.values() if tr['seen'] > .025]
-                return blob, v, pieces
-            finally:
-                perception.SPLIT_PAD = keep
-        blob, v, pieces = part(perception.SPLIT_PAD)
+        v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
+        for i in range(3):
+            v.frame(i * .01, {0: lump(-1.5), 1: lump(-2.)}, lambda a, b: 0.)        # touching: one blob
+        (blob,) = v.tracks
+        v.frame(.03, {0: lump(-1.44), 1: lump(-2.06)}, lambda a, b: .12)            # 12 cm apart
+        pieces = [tr for tr in v.tracks.values() if tr['seen'] > .025]
         self.assertEqual((len(pieces), [blob in tr['lineage'] for tr in pieces]), (2, [True, True]))
         self.assertEqual((blob in v.tracks, v.counts['births'], v.counts['apart']), (False, 1, 1))
-        blob, v, pieces = part(None)                                    # as before: two births and a ghost
-        self.assertEqual((len(pieces), [blob in tr['lineage'] for tr in pieces]), (2, [False, False]))
-        self.assertEqual((blob in v.tracks, v.counts['births'], v.counts['apart']), (True, 3, 0))
 
 
 # ---- control on synthetic sensor signals --------------------------------------------------------------

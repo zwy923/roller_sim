@@ -55,11 +55,11 @@ VIS_FULL = .9          # ... and fully trusted from this fraction on
 MATCH_GATE = .20       # m: a track and a blob are the same object within this (at 0.4 m/s a frame is 4 mm)
 LOST_S = .20           # s: a track without a blob for this long is dropped (lost, unless at an exit)
 GHOST_S = .015         # s: a track no blob has matched for longer than this (one frame missed) is a ghost: its count
-                       # is not added in a merge. None = added, as before 2026-10-04 (for comparison)
+                       # is not added in a merge
 REACQUIRE = .30        # m: a lost object counts as found again when a new track appears this close to it
 SPLIT_GAP = .05        # m: a blob that appears this close to a tracked one came off it (the track split)
 SPLIT_PAD = .03        # m: a blob that appears with its centroid inside the last outline (grown by this) of a track
-                       # that found no blob this frame is a piece of it. None = a new object, as before 2026-10-04
+                       # that found no blob this frame is a piece of it
 SHRINK = .75           # a merged blob whose plan area falls below this share of its area at the merge lost a lump
 BIRTH_S = .10          # s: a new track is fully trusted only after this long
 SOLID_MULTI = .90      # plan area / hull area below this: the blob holds more than one lump ...
@@ -359,7 +359,7 @@ class Vision:
                 # A ghost's lumps are already counted: the blob it followed came apart and its pieces went on under
                 # other ids. Added again at every merge, the count of ONE lump lying next to others on the feed
                 # belt reached 13 in 19 s (scatter 7001), and the station held it as 'multi' -- a single lump void
-                live = [o for o in old if GHOST_S is None or t - o['seen'] <= GHOST_S] or old
+                live = [o for o in old if t - o['seen'] <= GHOST_S] or old
                 self._new(t, blobs[i], frozenset().union(*(o['lineage'] for o in old)),
                           sum(o['count'] for o in live), 'merges', born=max(o['born'] for o in old))
                 self.events.append(dict(t_s=round(t, 3), event='merge', tids=list(near)))
@@ -404,9 +404,8 @@ class Vision:
             # either one's own, so when they part neither piece is matched to the blob's track. Until 2026-10-04
             # both were new objects without a past and the track lingered as a ghost: the station found an item's
             # object gone and an unknown one in its place, and held a single lump 'track_lost' (touching 7004)
-            src = [] if SPLIT_PAD is None else [
-                tr for tid, tr in self.tracks.items() if tid not in done_t and tr['seen'] < t - 1e-9
-                and inside(tr['m']['pts'], m['cx'], m['cy'], pad=SPLIT_PAD)]
+            src = [tr for tid, tr in self.tracks.items() if tid not in done_t and tr['seen'] < t - 1e-9
+                   and inside(tr['m']['pts'], m['cx'], m['cy'], pad=SPLIT_PAD)]
             if src:
                 old = min(src, key=lambda tr: math.hypot(m['cx'] - tr['m']['cx'], m['cy'] - tr['m']['cy']))
                 apart.setdefault(old['tid'], []).append(self._new(t, m, old['lineage'], 1, 'splits', born=old['born']))

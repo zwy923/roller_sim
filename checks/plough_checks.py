@@ -2,24 +2,23 @@
 first failure.
 
 1. Input validation: derive() refuses the combinations that used to build a silently nonsensical machine
-   (a lane wider than the belt, skew 0 or 90, a curved face turning the wrong way) and run() refuses
-   solref < 2*dt.
-2. Compiled geometry (static straight plate for the measurements): the lane's clear width between the two
-   walls really is lane_w, the plough plate's material face lies on P0..P1, plate bottom gap / height /
-   thickness, main belt top at z = 0, the side belt's inner face on the lane datum.
+   (a lane wider than the belt, a face turning the wrong way) and run() refuses solref < 2*dt.
+2. Compiled geometry: the lane's clear width between the two walls really is lane_w, the side belt's inner face
+   on the lane datum, main belt top at z = 0; with --face-kind plate the plate's material face lies on the face
+   polyline (first box at curve_top, last at curve_exit), plate bottom gap / height.
 3. Drive kinematics as compiled by MuJoCo: main belt, side belt, feed belt, buffer and measuring belts run at
    the speeds the report claims.
-4. beta budget: stagger = sweep*tan(beta), de-abreast rate = v*sin^2(beta), crawl = v*cos^2(beta), and the
-   friction locking bound tan(beta) < 1/mu_face that caps how steep the plough can be.
+4. The face's budget: the stagger and the transit of the turning face against their closed forms, the speeds
+   at the lane handoff, and the friction locking bound tan(beta) < 1/mu_face at the steep top.
 5. Block mass = density x convex-hull volume, and 'screen size' really is the intermediate axis; the long-axis
    cap is an axis extent, not a caliper size.
-6. Virtual motor: free run reaches rated speed, droop at the limit, stall on overload, unlimited drive.
-7. The line's face: curved polyline, roller face, hinge, feed band, scatter layout on the feed belt.
+6. Virtual motor: free run reaches rated speed, droop at the limit, stall on overload.
+7. The line's face: hinge at the bend, roller face, scatter layout on the feed belt.
 8. Lump outlines are placed with the geom frame of the compiled mesh (the observation bug of 2026-09-22).
 9. Moving parts (swinging face, separator) clear all other equipment over their whole stroke.
 10. Load bookkeeping: net and one-sided loads kept apart.
-11. Face retract: closing only with an empty sweep, pause if a lump enters it, reset fault if the face
-    does not get home.
+11. Face retract (the phase machine on an ideal servo): closing only with an empty sweep, pause if a lump
+    enters it, reset fault if the face does not get home.
 12. Feed belt: its geometry and step above the main belt, the drop beam, the release controller on the oracle
     view (approach, creep near the edge, release by centroid, stop on the beam, after-stop lumps, beam-miss
     and hanging-lump fallbacks, the 'lane' rule's next release only once the released lumps are through the
@@ -29,7 +28,6 @@ import math
 import sys
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import mujoco
@@ -41,8 +39,35 @@ from singulator import assembly, drives, face, feeder, lumps, machine, perceptio
 from singulator.config import parse_config  # noqa: E402
 
 LINE = parse_config(['--no-video', '--seed', '2'])
-# the static straight plate the section-2 measurements are taken on
-PLATE = dict(face_kind='plate', face_shape='straight', unjam=False)
+
+
+class IdealServo:
+    """A face servo that follows its reference exactly (the interface of face.FaceServo, no MuJoCo): the phase
+    machine in face.FaceRetract is checked on it. blocked(): it does not move this step (a jammed face)."""
+
+    def __init__(self, cfg, d, dt, blocked=lambda phase: False):
+        self.dt, self.blocked = dt, blocked
+        self.parts, self.piv = machine.face_parts(cfg, d)
+        self.lever = float(np.linalg.norm(d['P1'] - d['P0']))
+        self.delta, self.swing_s = math.radians(cfg['face_swing_deg']), cfg['face_swing_s']
+        self.drive = drives.make_motor(cfg['face_force_max'], 50., 1., cfg['motor_slip'])
+        self.theta = self.actual_omega = 0.
+        self.reached = False
+        self.loads, self.hold, self.by_phase = [], [], dict(out=[], back=[])
+
+    def command(self, phase, data):
+        goal = self.delta if phase == 'out' else 0. if phase == 'back' else self.theta
+        rate = abs(self.delta) / self.swing_s * self.dt
+        step = 0. if self.blocked(phase) else float(np.clip(goal - self.theta, -rate, rate))
+        self.theta, self.actual_omega = self.theta + step, step / self.dt
+
+    def record(self, t, phase, data, ramp):
+        pass
+
+    sweep = face.FaceServo.sweep
+
+    def report(self):
+        return {}
 
 
 def config(**over):
@@ -108,17 +133,16 @@ def oracle_observe(f, t, V, states, home):
 def main():
     print('--- 1. input validation (the geometry that used to silently invert) ---')
     bad = [('lane_w = 1.2 m (lane outside the belt)', dict(lane_w=1.2)),
-           ('skew 0 deg (ZeroDivisionError before)', dict(PLATE, skew_deg=0.)),
-           ('skew 90 deg', dict(PLATE, skew_deg=90.)),
-           ('curved face with exit not below top', dict(curve_top_deg=30., curve_exit_deg=55.))]
+           ('a face at 90 deg at the belt edge', dict(curve_top_deg=90.)),
+           ('a face with its exit not below its top', dict(curve_top_deg=30., curve_exit_deg=55.))]
     for label, over in bad:
         check(raises(lambda o=over: machine.derive(config(**o))), 'rejects %s' % label)
     check(not raises(lambda: machine.derive(config())), 'accepts the line')
     check(raises(lambda: simulate.run(config(solref=.0005, dt=.0005)), ValueError),
           'run() rejects solref 0.5 ms with dt 0.5 ms (needs solref >= 2*dt)')
 
-    print('--- 2. compiled geometry: static straight plate (skew 55, lane %.2f) ---' % LINE['lane_w'])
-    cfg, d, blocks, m, data = build(**PLATE)
+    print('--- 2. compiled geometry: lane %.2f m, plate face on the polyline ---' % LINE['lane_w'])
+    cfg, d, blocks, m, data = build(face_kind='plate')
     mujoco.mj_forward(m, data)
     ci, si, _ = geom(m, data, 'skirt_in')
     co, so, _ = geom(m, data, 'lane_out')
@@ -129,17 +153,30 @@ def main():
           and abs((ci[1] + si[1]) - cfg['lane_y']) < 1e-9,
           'lane clear width %.4f m = lane_w; side belt inner face and low skirt face at y %.4f = lane_y'
           % (lane_clear, low))
-    c, s, R = geom(m, data, 'plough')
-    ang = math.degrees(math.atan2(R[1, 0], R[0, 0]))
-    dp = abs(float(np.dot(d['P0'] - c, R[:, 1]))) - machine.PLOUGH['thickness'] / 2
-    dq = abs(float(np.dot(d['P1'] - c, R[:, 1]))) - machine.PLOUGH['thickness'] / 2
-    # the XML is written with %.4f sizes/positions and %.6f radians, so 0.1 mm is the resolution here
+    # the plate face: one box per segment of the face polyline (a derive() product; the line's rollers sit on
+    # this same polyline, checked in section 7). The XML is written with %.4f sizes/positions and %.6f radians,
+    # so 0.1 mm is the resolution here
     tol = 2e-4
-    check(abs(ang + cfg['skew_deg']) < 1e-3 and abs(2 * s[0] - d['s_end']) < tol
-          and abs(c[2] - s[2] - machine.PLOUGH['bottom_gap']) < tol and abs(2 * s[2] - machine.PLOUGH['height']) < tol
-          and abs(dp) < tol and abs(dq) < tol,
-          'plough plate: %.2f deg (want -%.0f), length %.4f m = diagonal, bottom gap %.4f m, height %.2f m,'
-          ' material face through P0/P1' % (ang, cfg['skew_deg'], 2 * s[0], c[2] - s[2], 2 * s[2]))
+    segs = len(d['face_pts']) - 1
+    c0, s0, R0 = geom(m, data, 'plough0')
+    cn, sn, Rn = geom(m, data, 'plough%d' % (segs - 1))
+    a0 = math.degrees(math.atan2(R0[1, 0], R0[0, 0]))
+    an = math.degrees(math.atan2(Rn[1, 0], Rn[0, 0]))
+
+    def on_face(c, R, p):
+        return abs(abs(float(np.dot(p - c, R[:, 1]))) - machine.PLOUGH['thickness'] / 2) < tol
+
+    lengths = sum(2 * geom(m, data, 'plough%d' % i)[1][0] for i in range(segs))
+    check(segs > 5 and abs(a0 + cfg['curve_top_deg']) < 1e-3 and abs(an + cfg['curve_exit_deg']) < 1e-3
+          and on_face(c0, R0, d['face_pts'][0]) and on_face(c0, R0, d['face_pts'][1])
+          and on_face(cn, Rn, d['face_pts'][segs - 1]) and on_face(cn, Rn, d['face_pts'][segs])
+          and np.allclose(d['face_pts'][0], d['P0']) and np.allclose(d['face_pts'][segs], d['P1'])
+          and abs(d['P1'][1] - d['lane_top']) < 1e-12
+          and abs(lengths - d['report']['diagonal_length_m']) < segs * tol
+          and abs(c0[2] - s0[2] - machine.PLOUGH['bottom_gap']) < tol and abs(2 * s0[2] - machine.PLOUGH['height']) < tol,
+          '%d face boxes from P0 to the bend P1 on the lane wall line: first %.1f deg at the belt edge, last %.1f deg'
+          ' at the lane, %.4f m long in all, bottom gap %.4f m, height %.2f m, material face through the polyline'
+          % (segs, -a0, -an, lengths, c0[2] - s0[2], 2 * s0[2]))
     cb, sb, _ = body_geom(m, data, 'mfloor')
     check(abs(cb[2] + sb[2]) < 1e-12 and abs(cb[0] + sb[0] - d['belt_x1']) < 1e-4,
           'main belt top z %.4f (want 0), head edge at x %.3f' % (cb[2] + sb[2], cb[0] + sb[0]))
@@ -161,25 +198,43 @@ def main():
           'speeds: main belt %.3f, side belt %.3f = %.1fx, feed belt %.3f, buffer belt %.3f, measuring belt %.3f m/s'
           % (got['mfloor'], got['vslat1'], cfg['side_belt_ratio'], got['feeder'], got['bbelt'], got['mbelt']))
 
-    print('--- 4. beta budget and the friction locking bound ---')
+    print('--- 4. the budget of the face and the friction locking bound ---')
     g = d['report']
     sweep = g['sweep_m']
-    check(abs(g['predicted_stagger_of_outermost_lump_m'] - sweep * math.tan(d['beta'])) < 1e-12
-          and abs(g['deabreast_rate_m_s'] - cfg['v_belt'] * math.sin(d['beta']) ** 2) < 1e-12
-          and abs(g['face_crawl_speed_m_s'] - cfg['v_belt'] * math.cos(d['beta']) ** 2) < 1e-12
-          and abs(g['face_lateral_speed_m_s'] - cfg['v_belt'] * math.sin(d['beta']) * math.cos(d['beta'])) < 1e-12,
-          'stagger %.3f m = sweep*tan(beta), de-abreast rate %.3f m/s = v*sin^2(beta), crawl %.3f m/s,'
-          ' lateral %.3f m/s' % (g['predicted_stagger_of_outermost_lump_m'], g['deabreast_rate_m_s'],
-                                 g['face_crawl_speed_m_s'], g['face_lateral_speed_m_s']))
+    t, e = math.radians(cfg['curve_top_deg']), math.radians(cfg['curve_exit_deg'])
+    check(abs(sweep - (cfg['belt_w'] - d['lane_top'])) < 1e-12, 'sweep %.3f m = belt width - lane top' % sweep)
+    # the stagger budget of a linearly-turning face has a closed form: sweep * (ln cos top - ln cos exit)/(exit-top)
+    analytic = sweep * (math.log(math.cos(t)) - math.log(math.cos(e))) / (e - t)
+    got = g['predicted_stagger_of_outermost_lump_m']
+    # the 24-box polyline carries ~0.5 % discretisation against the smooth integral, so 1 % is the bar
+    check(abs(got - analytic) < 1e-2 * analytic,
+          'stagger %.3f m = sum tan(beta) dy over the %d boxes (smooth-curve analytic %.3f, %.1f %% apart); a straight'
+          ' %.0f deg face on the same sweep would give %.3f m'
+          % (got, segs, analytic, 100 * abs(got - analytic) / analytic, cfg['curve_top_deg'], sweep * math.tan(t)))
+    crawl_top = cfg['v_belt'] * math.cos(t) ** 2      # the steep top is the slowest point of the face
+    check(abs(g['face_crawl_speed_m_s'] - cfg['v_belt'] * math.cos(e) ** 2) < 1e-12
+          and abs(g['deabreast_rate_m_s'] - cfg['v_belt'] * math.sin(e) ** 2) < 1e-12
+          and abs(g['face_lateral_speed_m_s'] - cfg['v_belt'] * math.sin(e) * math.cos(e)) < 1e-12
+          and abs(g['along_face_speed_m_s'] - cfg['v_belt'] * math.cos(e)) < 1e-12
+          and g['face_crawl_speed_m_s'] > crawl_top,
+          'at the lane handoff (%g deg): crawl %.3f m/s = v*cos^2, de-abreast rate %.3f m/s = v*sin^2, lateral %.3f m/s;'
+          ' the crawl at the %.0f deg top is %.3f m/s (the handoff is %.1fx faster)'
+          % (cfg['curve_exit_deg'], g['face_crawl_speed_m_s'], g['deabreast_rate_m_s'], g['face_lateral_speed_m_s'],
+             cfg['curve_top_deg'], crawl_top, g['face_crawl_speed_m_s'] / crawl_top))
+    # transit likewise: integral dy / (v sin b cos b) = sweep/v * ln(tan exit / tan top) / (exit - top)
+    transit_analytic = sweep / cfg['v_belt'] * math.log(math.tan(e) / math.tan(t)) / (e - t)
+    check(abs(g['face_transit_s'] - transit_analytic) < 1e-2 * transit_analytic,
+          'face transit %.2f s for a lump crossing the whole sweep (analytic %.2f s)'
+          % (g['face_transit_s'], transit_analytic))
     f = g['face_locking']
-    check(abs(f['ratio_mu_tan_beta'] - cfg['friction_steel'] * math.tan(d['beta'])) < 1e-12
+    check(abs(f['ratio_mu_tan_beta'] - cfg['friction_steel'] * math.tan(t)) < 1e-12
           and f['slides_along_face'] and abs(f['lock_ceiling_deg'] - math.degrees(math.atan(1 / cfg['friction_steel']))) < 1e-9,
-          'locking: mu*tan(beta) = %.2f < 1, ceiling %.1f deg for mu %.2f (margin %.0f %%)'
+          'locking at the top: mu*tan(beta) = %.2f < 1, ceiling %.1f deg for mu %.2f (margin %.0f %%)'
           % (f['ratio_mu_tan_beta'], f['lock_ceiling_deg'], f['mu_face'], 100 * f['margin']))
-    steep = machine.derive(config(**dict(PLATE, skew_deg=70.)))['report']['face_locking']
-    lined = machine.derive(config(**dict(PLATE, skew_deg=65., friction_steel=.20)))['report']['face_locking']
+    steep = machine.derive(config(curve_top_deg=70.))['report']['face_locking']
+    lined = machine.derive(config(curve_top_deg=65., friction_steel=.20))['report']['face_locking']
     check(not steep['slides_along_face'] and lined['slides_along_face'],
-          'the bound bites: 70 deg on steel reports LOCKS, 65 deg on a UHMW-PE face (0.20) still slides')
+          'the bound bites: a 70 deg top on steel reports LOCKS, 65 deg on a UHMW-PE face (0.20) still slides')
 
     print('--- 5. blocks and material ---')
     rng = np.random.default_rng(3)
@@ -224,7 +279,7 @@ def main():
 
     print('--- 6. virtual motor ---')
     dtm = .0005
-    mo = drives.make_motor(True, 1000., 300., .40, .05)
+    mo = drives.make_motor(1000., 300., .40, .05)
     for _ in range(4000):
         drives.motor_update(mo, 1., 0., dtm)
     free = mo['f']
@@ -234,7 +289,7 @@ def main():
     for _ in range(4000):
         drives.motor_update(mo, 1., -2500., dtm)
     stalled = mo['f']
-    big = drives.make_motor(True, 15000., 300., .40, .05)
+    big = drives.make_motor(15000., 300., .40, .05)
     for _ in range(4000):
         drives.motor_update(big, 1., -12000., dtm)
     stiff = big['f']
@@ -242,75 +297,19 @@ def main():
           'motor: free %.3f, at half limit %.3f (expect 0.975), overload %.3f, 15 kN drive under 12 kN %.3f'
           % (free, loaded, stalled, stiff))
 
-    print('--- 7. the line: curved face + roller face + swing ---')
+    print('--- 7. the line: hinged roller face, scatter layout ---')
     cfgv, dv, _, mv, datav = build()
     mujoco.mj_forward(mv, datav)
-    # the polyline itself is a derive() product, so check it on a PLATE build; the line's roller face is
-    # checked further down (its rollers sit on this same polyline)
-    cfgp, dp, _, mp, datap = build(face_kind='plate', unjam=False)
-    mujoco.mj_forward(mp, datap)
     Bv = mujoco.mjtObj.mjOBJ_BODY
-    segs = len(dp['face_pts']) - 1
-    c0, s0, R0 = geom(mp, datap, 'plough0')
-    cn, sn, Rn = geom(mp, datap, 'plough%d' % (segs - 1))
-    a0 = math.degrees(math.atan2(R0[1, 0], R0[0, 0]))
-    an = math.degrees(math.atan2(Rn[1, 0], Rn[0, 0]))
-
-    def on_face(c, R, p):
-        return abs(abs(float(np.dot(p - c, R[:, 1]))) - machine.PLOUGH['thickness'] / 2) < 2e-4
-
-    check(segs > 5 and abs(a0 + cfgv['curve_top_deg']) < 1e-3 and abs(an + cfgv['curve_exit_deg']) < 1e-3
-          and on_face(c0, R0, dp['face_pts'][0]) and on_face(c0, R0, dp['face_pts'][1])
-          and on_face(cn, Rn, dp['face_pts'][segs - 1]) and on_face(cn, Rn, dp['face_pts'][segs]),
-          '%d face boxes: first %.1f deg at the belt edge, last %.1f deg at the lane, material face'
-          ' through the polyline' % (segs, -a0, -an))
-    # the stagger budget of a linearly-turning face has a closed form: sweep * (ln cos top - ln cos exit)/(exit-top)
-    sweep = cfgv['belt_w'] - dv['lane_top']
-    t, e = math.radians(cfgv['curve_top_deg']), math.radians(cfgv['curve_exit_deg'])
-    analytic = sweep * (math.log(math.cos(t)) - math.log(math.cos(e))) / (e - t)
-    got = dv['report']['predicted_stagger_of_outermost_lump_m']
-    straight55 = sweep * math.tan(math.radians(cfgv['skew_deg']))
-    # the 24-box polyline carries ~0.5 % discretisation against the smooth integral, so 1 % is the bar
-    check(abs(got - analytic) < 1e-2 * analytic,
-          'curve stagger %.3f m = sum tan(beta) dy over the %d boxes (smooth-curve analytic %.3f, %.1f %%'
-          ' apart); a straight %.0f deg face on the same sweep would give %.3f m'
-          % (got, segs, analytic, 100 * abs(got - analytic) / analytic, cfgv['skew_deg'], straight55))
-    gr = dv['report']
-    crawl_top = cfgv['v_belt'] * math.cos(t) ** 2     # the steep top is the slowest point of the face
-    check(abs(gr['face_crawl_speed_m_s'] - cfgv['v_belt'] * math.cos(e) ** 2) < 1e-12
-          and gr['face_crawl_speed_m_s'] > crawl_top,
-          'handoff crawl %.3f m/s = v*cos^2(%g deg), against %.3f m/s at the %.0f deg top'
-          ' (handoff is %.1fx faster)'
-          % (gr['face_crawl_speed_m_s'], cfgv['curve_exit_deg'], crawl_top, cfgv['curve_top_deg'],
-             gr['face_crawl_speed_m_s'] / crawl_top))
-    # transit likewise: integral dy / (v sin b cos b) = sweep/v * ln(tan exit / tan top) / (exit - top)
-    transit_analytic = sweep / cfgv['v_belt'] * math.log(math.tan(e) / math.tan(t)) / (e - t)
-    check(abs(gr['face_transit_s'] - transit_analytic) < 1e-2 * transit_analytic,
-          'face transit %.2f s for a lump crossing the whole sweep (analytic %.2f s)'
-          % (gr['face_transit_s'], transit_analytic))
     fj = mujoco.mj_name2id(mv, J, 'facej')
     fb = mujoco.mj_name2id(mv, Bv, 'face')
-    piv = dv['P1'] if cfgv['face_hinge'] == 'bend' else dv['P0']
+    piv = dv['P1']
     check(fj >= 0 and fb >= 0 and mv.jnt_type[fj] == int(mujoco.mjtJoint.mjJNT_HINGE)
           and np.allclose(mv.jnt_axis[fj], [0., 0., 1.])
-          and np.allclose(datav.xpos[fb][:2], piv[:2], atol=2e-4),   # pos goes through the XML as %.4f
-          'swing face: hinge about z at the %s end (%.3f, %.3f), rest angle %+.0f deg'
-          % (cfgv['face_hinge'], datav.xpos[fb][0], datav.xpos[fb][1], cfgv['face_swing_deg']))
-    # the feed band: --feed-band plough keeps every lump above lane_top so it is guaranteed to meet the face;
-    # --feed-band full (the line) spreads the batch over the whole belt, which is the honest abreast test --
-    # lumps below lane_top ride into the lane without ever touching the face. The check pins which is in force.
-    for band, want_above in (('plough', True), ('full', False)):
-        cfb = config(feed_band=band, count=3)
-        dfb = machine.derive(cfb)
-        rng_f = np.random.default_rng(7)
-        blks_f = lumps.make_blocks(cfb, rng_f)
-        layer, _, _ = lumps.plan_rows(cfb, blks_f, rng_f, dfb)
-        lows = [y + lumps.footprint(blks_f[k]['vertices'], yaw)[2] for k, x, y, z, yaw in layer]
-        above = min(lows) >= dfb['lane_top'] - 1e-9
-        check(above == want_above,
-              'feed band %-6s: %d lumps, lowest starts at y = %.3f m (lane_top %.2f) -> %s'
-              % (band, len(lows), min(lows), dfb['lane_top'],
-                 'every lump meets the face' if above else 'the lower ones ride past the face'))
+          and np.allclose(datav.xpos[fb][:2], piv[:2], atol=2e-4)    # pos goes through the XML as %.4f
+          and mv.actuator_trnid[mv.actuator('face_drive').id][0] == fj and mv.dof_armature[mv.jnt_dofadr[fj]] == 0.,
+          'swing face: hinge about z at the bend (%.3f, %.3f), a position servo on it, swing %+.0f deg'
+          % (datav.xpos[fb][0], datav.xpos[fb][1], cfgv['face_swing_deg']))
     # --face-kind rollers: the diagonal becomes free-spinning vertical rollers whose SURFACES are
     # tangent to the same material face the plate presented, so the lane geometry is unchanged.
     B = mujoco.mjtObj.mjOBJ_BODY
@@ -410,7 +409,7 @@ def main():
     # equipment never collides with equipment in the simulation, so this is the only place an
     # interference would show. The camera masts are placed for the line's roller face: a swinging steel plate
     # (--face-kind plate) would hit the single-file camera's mast (-32 mm, 2026-09-30)
-    for label, over in (('the line', {}), ('static roller face', dict(unjam=False))):
+    for label, over in (('the line', {}),):
         cc = config(**over)
         dd = machine.derive(cc)
         res = assembly.motion_clearance(cc, dd)
@@ -455,15 +454,13 @@ def main():
     intruder = {0: sq(.30, .75, .95, 1.18)}
     lane_lump = {1: sq(1.80, 2.20, .10, .50)}
 
-    def cycle(t1, plans=lambda t: {}, busy=lambda t: False, tau=lambda t, f: 0., stop_on_timeout=False):
-        fr_ = face.FaceRetract(cf, df, dtf, joint=(0, 0))
-        data_ = SimpleNamespace(qpos=np.zeros(1), qvel=np.zeros(1), qfrc_constraint=np.zeros(1))
+    def cycle(t1, plans=lambda t: {}, busy=lambda t: False, blocked=lambda phase: False, stop_on_timeout=False):
+        fr_ = face.FaceRetract(cf, IdealServo(cf, df, dtf, blocked))
         fr_.start(0.)
         tt, n, log = 0., 0, []
         while tt < t1 and fr_.phase not in ('idle', 'fault'):
-            fr_.command(tt, data_)
-            data_.qfrc_constraint[0] = tau(tt, fr_)
-            fr_.record(tt, data_)
+            fr_.command(tt, None)
+            fr_.record(tt, None)
             if n % 20 == 0:
                 fr_.zone_busy = busy(tt)
                 fr_.check_sweep(plans(tt))
@@ -474,8 +471,8 @@ def main():
         return fr_, tt, log
     swing = cf['face_swing_s']
     ok, t_ok, _ = cycle(10., plans=lambda t: lane_lump)
-    check(ok.phase == 'idle' and ok.theta == 0. and ok.fault is None and ok.closed_on_empty
-          and 2.2 < t_ok < 2.5,
+    check(ok.phase == 'idle' and abs(ok.theta) < 1e-9 and ok.fault is None and ok.closed_on_empty and ok.at_home
+          and ok.face.reached and 2.2 < t_ok < 2.5,
           'clear section, lump only in the lane: out, hold, close -> home at %.2f s' % t_ok)
     held, t_held, log = cycle(40., plans=lambda t: intruder, stop_on_timeout=True)
     check(held.phase == 'hold' and held.in_sweep == [0] and abs(t_held - (swing + cf['face_hold_max_s'])) < .05
@@ -484,15 +481,18 @@ def main():
           % t_held)
     paused, t_p, log = cycle(12., plans=lambda t: intruder if swing + .6 < t < swing + 2. else {})
     phases = [p for _, p in log]
-    check(paused.phase == 'idle' and paused.theta == 0. and paused.events[-1]['pauses'] == 1
+    check(paused.phase == 'idle' and abs(paused.theta) < 1e-9 and paused.events[-1]['pauses'] == 1
           and phases.index('back') < len(phases) - 1 - phases[::-1].index('hold'),
           'lump enters the sweep while closing: face pauses (back -> hold), resumes when clear, home at %.2f s' % t_p)
-    # resisting moment far above the drive limit while closing: the face cannot get home
-    jammed_face, t_f, _ = cycle(30., tau=lambda t, f: -30000. * f.lever if f.phase == 'back' else 0.)
+    # the face cannot move while closing (a load far above the servo's limit): it does not get home
+    jammed_face, t_f, _ = cycle(30., blocked=lambda phase: phase == 'back')
     check(jammed_face.phase == 'fault' and jammed_face.fault['reason'] == 'reset_not_reached'
-          and jammed_face.theta != 0. and abs(t_f - (1.3 + 6 * swing)) < .05,
+          and jammed_face.theta != 0. and abs(t_f - (1.3 + 6 * swing)) < .05 and not jammed_face.at_home,
           'face blocked while closing: reset fault at %.2f s, %.1f deg from home -- not idle'
           % (t_f, jammed_face.fault['angle_deg']))
+    stuck_out, t_s, _ = cycle(30., blocked=lambda phase: phase == 'out')
+    check(stuck_out.phase == 'fault' and stuck_out.fault['reason'] == 'retract_not_reached' and abs(t_s - 6 * swing) < .05,
+          'face blocked while retracting: fault at %.2f s, no closing attempted' % t_s)
 
     print('--- 12. feed belt: step-down transfer released lump by lump ---')
     cq = config(feeder_release='lane', sensing='oracle')

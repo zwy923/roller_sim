@@ -21,7 +21,7 @@ from .station import DEFAULTS as STATION_DEFAULTS
 ROOT = Path(__file__).resolve().parents[1]     # project folder
 FONT = Path(r'C:\Windows\Fonts\msyh.ttc')
 
-LAYOUTS = ('scatter', 'rows', 'aligned', 'touching', 'flat', 'oblique')
+LAYOUTS = ('scatter', 'aligned', 'touching', 'flat', 'oblique')
 
 
 def parse_config(argv=None):
@@ -41,12 +41,6 @@ def parse_config(argv=None):
                    help="when the feed belt lets the next lump go: 'predict' (default) stages the next lump at the "
                         "creep zone and lets it go as soon as the ones before are predicted to be out of the funnel "
                         "when it gets there; 'lane' once every released lump is in the straight lane")
-    p.add_argument('--blob-lead', choices=('front', 'centroid'), default='front',
-                   help="--sensing vision: how the feed belt leads a blob (lumps lying against each other, one "
-                        "object to the cameras): 'front' (default) = by its front edge, as far forward as the "
-                        "centroid of the lump in front can be; 'centroid' = by the blob's outline centroid, as "
-                        "before 2026-10-04 (for comparison: staging then carries the lump in front over the edge "
-                        "with no release decided)")
     for key, value in STATION_DEFAULTS.items():
         p.add_argument('--' + key.replace('_', '-'), type=float, default=value)
     p.add_argument('--weigh-stop', choices=('rear', 'centre'), default='rear',
@@ -65,7 +59,7 @@ def parse_config(argv=None):
                    help="what the feed belt controller reads (with --sensing vision): 'oracle' (default since "
                         "2026-10-05, user: 给料直接读质心) = one object per lump with its true centroid and outline; "
                         "'vision' = the cameras' objects like the rest of the line (lumps lying against each other "
-                        "are one object, see --blob-lead). The drop beam is the stop signal either way")
+                        "are one object, led by its front edge). The drop beam is the stop signal either way")
     p.add_argument('--weigh-model', choices=('fixed', 'steady'), default='fixed',
                    help="the measuring device on M: 'fixed' (default since 2026-10-05, user: 称重和测体积是固定耗时 "
                         "1 s 的概念装置) = mass and volume are read scan_s after M is at rest, whatever the reading "
@@ -77,8 +71,8 @@ def parse_config(argv=None):
                         "vision_off:T0-T1 (every camera dark). NAME: beam_feed, beam_in, beam_stop, beam_gangue")
     p.add_argument('--layout', choices=LAYOUTS, default='scatter',
                    help="how the batch lies on the feed belt: 'scatter' (default: random x, y and yaw, one layer, "
-                        "lumps may touch), 'rows' (tidy rows across the belt), or a bench layout "
-                        "(singulator/trial.py): 'aligned' (并齐), 'touching' (相贴), 'flat' (扁平), 'oblique' (斜放)")
+                        "lumps may touch), or a bench layout (singulator/trial.py): 'aligned' (并齐), 'touching' "
+                        "(相贴), 'flat' (扁平), 'oblique' (斜放)")
     p.add_argument('--bench', action='store_true',
                    help='the feed head bench trial (designs/transfer_trial/): the run ends once every lump lies on '
                         'the main belt below the feed belt head')
@@ -89,23 +83,18 @@ def parse_config(argv=None):
                         "pair laid in the lane; 'off_scale_neighbour' = while the first item is weighed a lump is "
                         "laid across the buffer / measuring belt joint against it; 'off_scale_bridge' = the lump "
                         "being weighed is pushed back across the joint. Scan failure: --fault scan_fail:0")
-    p.add_argument('--skew-deg', type=float, default=55.,
-                   help='plough angle to the belt travel for --face-shape straight; must stay below '
-                        'atan(1/friction-steel) -- 65.8 deg on the as-built steel face -- or lumps lock '
-                        'on it instead of sliding along it. Unused for the curved face (see --curve-top-deg)')
     p.add_argument('--face-kind', choices=('plate', 'rollers'), default='rollers',
                    help="'rollers' (default): the plough face is a row of free-spinning vertical rollers (D 90 mm "
                         "at 0.11 m pitch, 0.50 m tall) the lumps ROLL against, which removes the sliding friction "
                         "that queues lumps, spins them and anchors an arch on that abutment; 'plate': a steel "
                         "plate they SLIDE along. The lane's outer wall and the skirts stay plates")
-    p.add_argument('--face-shape', choices=('straight', 'curve'), default='curve',
-                   help="curve (default): the face turns from --curve-top-deg at the belt edge to --curve-exit-deg "
-                        "at the lane, shearing abreast pairs apart on the steep top and handing lumps to the lane "
-                        "nearly aligned; straight: one flat diagonal at --skew-deg")
     p.add_argument('--curve-top-deg', type=float, default=55.,
-                   help='curved face: angle at the belt edge (locking bound applies here)')
+                   help='the face turns from this angle to the belt travel at the belt edge (shearing abreast pairs '
+                        'apart on the steep top) to --curve-exit-deg at the lane. A plate face must stay below '
+                        'atan(1/friction-steel) here -- 65.8 deg on steel -- or lumps lock on it instead of '
+                        'sliding along it')
     p.add_argument('--curve-exit-deg', type=float, default=20.,
-                   help='curved face: angle at the lane, i.e. the direction lumps enter the lane with')
+                   help='angle of the face at the lane, i.e. the direction lumps enter the lane with')
     p.add_argument('--belt-w', type=float, default=1.2, help='clear belt width the stream arrives on')
     p.add_argument('--lane-y', type=float, default=.05, help='y of the low skirt, the lane datum')
     p.add_argument('--lane-w', type=float, default=.60,
@@ -115,13 +104,13 @@ def parse_config(argv=None):
                         '0.60 m, 1.4 %% at 0.58 m (EXPERIMENTS.md S5); the narrower the lane, the less room a lump '
                         'coming at an angle has (S5: one jam at the lane mouth in 40 batches at 0.58 m)')
     p.add_argument('--lane-len', type=float, default=.9, help='straight lane between the bend and the exit plane')
-    p.add_argument('--plough-x', type=float, default=.50, help='x of the high end of the diagonal')
+    p.add_argument('--plough-x', type=float, default=.50, help='x of the high end of the face, at the belt edge')
     p.add_argument('--v-belt', type=float, default=.40, help='main belt speed, m/s')
     p.add_argument('--friction-belt', type=float, default=FRICTION['block_belt'],
                    help='lump on the rubber belt cover')
     p.add_argument('--friction-steel', type=float, default=FRICTION['block_steel'],
-                   help='lump on the plough plate and skirts; pass 0.20 for a UHMW-PE lined plate -- it also '
-                        'raises the locking ceiling from 65.8 to 78.7 deg, which is what makes skew > 60 deg safe')
+                   help='lump on steel: a plate face (--face-kind plate), the lane wall and the skirts; 0.20 '
+                        'stands for a UHMW-PE lining')
     p.add_argument('--friction-block', type=float, default=FRICTION['block_block'],
                    help='lump on lump')
     p.add_argument('--dampratio', type=float, default=1.,
@@ -140,12 +129,6 @@ def parse_config(argv=None):
                         'lumps still span more than 0.55 m in plan (max ~0.63 m), and two lumps can wedge in '
                         'the lane whatever their size. Pass a large value for an uncapped screen class')
     p.add_argument('--count', type=int, default=5, help='lumps per batch (3-5 in service)')
-    p.add_argument('--feed-band', choices=('plough', 'full'), default='full',
-                   help="'full' (default): spread the batch over the whole belt width, so the lumps below "
-                        "lane_top ride into the lane without meeting the face; 'plough': inside the band the face "
-                        "can reach (y above lane_top)")
-    p.add_argument('--material-model', choices=('composition', 'legacy_binary'), default='composition',
-                   help='dry coal/gangue endmember mixture; legacy_binary replays the old two-category sampler')
     p.add_argument('--gangue-fraction', type=float, default=.3,
                    help='gangue-rich category probability by COUNT, not batch gangue mass fraction')
     p.add_argument('--middlings-fraction', type=float, default=.25,
@@ -157,8 +140,6 @@ def parse_config(argv=None):
     p.add_argument('--feed-len', type=float, default=1.2,
                    help='length of the scatter patch, m; it grows in 0.2 m steps until the batch fits in '
                         'one layer, so a small value just means "as dense as it will pack"')
-    p.add_argument('--row-gap', type=float, default=.10, help='--layout rows: gap between rows, m')
-    p.add_argument('--row-stagger', type=float, default=.12, help='--layout rows: stagger within a row, m')
     p.add_argument('--side-belt', dest='side_belt', action='store_true', default=True,
                    help='a driven side belt in place of the static low-side skirt over the funnel and lane (default)')
     p.add_argument('--no-side-belt', dest='side_belt', action='store_false',
@@ -176,17 +157,14 @@ def parse_config(argv=None):
     p.add_argument('--motor-slip', type=float, default=.05,
                    help='speed droop at the force limit; note the droop line gain is force-max/slip, so raising '
                         'the limit also stiffens the drive (1.5 -> 15 kN at 5%% slip is a 10x stiffer drive)')
-    p.add_argument('--no-drive-limit', dest='drive_limit', action='store_false')
     p.add_argument('--dt', type=float, default=.00025,
                    help='physics step (s); default 0.25 ms after paired refinement exposed 0.5 ms sensitivity')
     p.add_argument('--solref', type=float, default=.002, help='contact time constant; must stay >= 2*dt')
     p.add_argument('--ramp', type=float, default=.4)
     p.add_argument('--duration', type=float, default=150.)
-    p.add_argument('--face-hinge', choices=('upstream', 'bend'), default='bend',
-                   help='where the swinging face is hinged: the bend (default) or its upstream end at the outer skirt')
     p.add_argument('--face-swing-deg', type=float, default=-25.,
-                   help='swing angle, CCW positive in the top view (+x flow right, +y up); about the bend, '
-                        'negative opens the funnel')
+                   help='swing angle of the face about its hinge at the bend, CCW positive in the top view (+x flow '
+                        'right, +y up); negative opens the funnel')
     p.add_argument('--face-swing-s', type=float, default=1., help='time to swing out, and again to swing back')
     p.add_argument('--face-hold-s', type=float, default=.3,
                    help='minimum time the face stays retracted before it may close')
@@ -198,10 +176,9 @@ def parse_config(argv=None):
     p.add_argument('--face-force-max', type=float, default=10000.,
                    help='face servo torque limit divided by the chord, N; assumed, not cylinder sizing. '
                         'Default physical hinge includes carrier/roller inertia and soft joint stops')
-    p.add_argument('--no-unjam', dest='unjam', action='store_false',
-                   help='disable the face retract, so the first detected stall ends the run')
     p.add_argument('--unjam-max', type=int, default=4,
-                   help='retract actions per batch before a further stall counts as a jam')
+                   help='retract actions per batch before a further stall counts as a jam (0: the first detected '
+                        'stall ends the run)')
     p.add_argument('--jam-window', type=float, default=4.,
                    help='a lump in the section (plough start - 0.3 m .. lane exit) whose centroid advances less '
                         'than jam-speed x jam-window over this window, with no tail leaving the lane, is a stall')

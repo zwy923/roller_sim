@@ -1,10 +1,10 @@
 """Retract action of the hinged plough face, and the bookkeeping of what it met.
 
-The default face is a finite-torque physical hinge with a rate-limited position servo and soft joint
-limits. Carrier mass/inertia and controller gains are assumptions. A kinematic diagnostic option is
-retained for model comparisons. Torque divided by chord is not cylinder force or total contact force.
-Whether the face touches material is measured separately, from the lump-face contact pairs.
+The face is a finite-torque physical hinge with a rate-limited position servo and soft joint limits (FaceServo).
+Carrier mass/inertia and controller gains are assumptions. Torque divided by chord is not cylinder force or total
+contact force. Whether the face touches material is measured separately, from the lump-face contact pairs.
 
+FaceRetract is the phase machine; it drives any servo with FaceServo's interface (the checks use an ideal one).
 Phases: idle -> out (swing to face_swing_deg) -> hold (retracted) -> back (closing) -> idle, or fault.
   * Closing starts only when the section is clear AND no lump reaches into the area the face will sweep
     on its way home (the whole lump outline).
@@ -20,7 +20,7 @@ import math
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from .drives import load_stats, make_motor, motor_update
+from .drives import load_stats, make_motor
 from .machine import MOTION_CLEARANCE, face_parts
 
 
@@ -39,79 +39,40 @@ def polygons_overlap(P, H, margin):
     return ~sep
 
 
-class Leaf:
-    """The face as a kinematically driven hinged part: its angle and commanded rate, a force-limited drive
-    referred to the far end (lever = hinge to far end), and the loads it met."""
+class FaceServo:
+    """The face's hinge in the MuJoCo model: a finite-torque position servo. MuJoCo alone advances the hinge
+    position and velocity.
 
-    def __init__(self, joint, parts, piv, lever, delta, swing_s, force_max, slip, dt):
-        self.joint, self.parts, self.piv = joint, parts, piv      # joint = (qpos adr, dof adr)
-        self.lever, self.delta, self.swing_s, self.dt = lever, delta, swing_s, dt
-        v_tip = abs(delta) * lever / swing_s
-        self.drive = make_motor(True, force_max, 50., max(v_tip, 1e-6), slip)
-        self.theta = self.omega = 0.
+    The reference moves at the configured swing rate but stays close to the measured angle, so a stalled
+    actuator cannot accumulate a whole stroke of position error. Joint limits are soft stops.
+
+    What FaceRetract uses of it (the servo interface): parts, piv (plan polygons of the moving parts at rest and
+    the hinge point), lever, delta, swing_s; theta and actual_omega (measured); reached; command(phase, data)
+    before a physics step and record(t, phase, data, ramp) after it; sweep(); drive, loads, hold, by_phase and
+    the actuator totals for the report.
+    """
+
+    def __init__(self, cfg, d, dt, joint, actuator):
+        """joint = (qpos adr, dof adr) of the face hinge; actuator = its position actuator's id."""
+        self.cfg, self.dt, self.joint, self.actuator = cfg, dt, joint, actuator
+        self.parts, self.piv = face_parts(cfg, d)
+        # moment arm: the chord between the hinge and the far end -- NOT the polyline length, which for a
+        # curved face is longer than the straight distance the tip actually travels
+        self.lever = float(np.linalg.norm(d['P1'] - d['P0']))
+        self.delta, self.swing_s = math.radians(cfg['face_swing_deg']), cfg['face_swing_s']
+        v_tip = abs(self.delta) * self.lever / self.swing_s
+        self.drive = make_motor(cfg['face_force_max'], 50., max(v_tip, 1e-6), cfg['motor_slip'])
+        self.theta = self.actual_omega = 0.
         self.reached = False
         self.loads, self.hold, self.by_phase = [], [], dict(out=[], back=[])
-
-    def write(self, phase, data):
-        """Write the hinge position/velocity for the coming step."""
-        q, v = self.joint
-        if phase in ('out', 'back'):
-            w = self.omega * self.drive['f']
-            nxt = self.theta + w * self.dt
-            if phase == 'back' and nxt * self.theta < 0:     # do not overshoot home
-                nxt, w = 0., -self.theta / self.dt
-            if phase == 'out' and abs(nxt) > abs(self.delta):
-                nxt, w = self.delta, (self.delta - self.theta) / self.dt
-            data.qpos[q] = self.theta
-            data.qvel[v] = w
-            self.theta = nxt
-        else:
-            data.qpos[q] = self.theta
-            data.qvel[v] = 0.
-
-    def record(self, t, phase, data, ramp):
-        """After the step: hinge moment while moving (drive load) or while standing (pin/stop/frame)."""
-        tau = float(data.qfrc_constraint[self.joint[1]])
-        if phase in ('out', 'back') and self.omega:
-            tip_load = tau * math.copysign(1., self.omega) / self.lever    # negative resists
-            motor_update(self.drive, 1., tip_load, self.dt)
-            self.drive['loads'].append(tip_load)
-            self.loads.append(tip_load)
-            self.by_phase[phase].append(tip_load)
-        else:
-            self.drive['f'] = 0.
-            # what the pin, the stop and the frame carry while the part just stands there: the material
-            # leans on it the whole time, and that load is NOT what the actuator has to supply
-            if t > ramp + .2:
-                self.hold.append(abs(tau) / self.lever)
-
-    def sweep(self):
-        """Plan-view polygons of the part at angles from the present one back to home (<= 1 deg apart),
-        i.e. everything it will pass through while closing."""
-        n = max(2, int(math.ceil(abs(self.theta) / math.radians(1.))) + 1)
-        out = []
-        for th in np.linspace(self.theta, 0., n):
-            c, s = math.cos(th), math.sin(th)
-            out.append(self.piv + (self.parts - self.piv) @ np.array([[c, s], [-s, c]]))
-        return np.concatenate(out) if out else self.parts
-
-
-class DynamicLeaf(Leaf):
-    """Finite-torque position servo. MuJoCo alone advances the hinge position and velocity.
-
-    The reference moves at the configured swing rate but stays close to the measured angle, so a
-    stalled actuator cannot accumulate a whole stroke of position error. Joint limits are soft stops.
-    """
-    def __init__(self, *args, actuator, cfg, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.actuator, self.cfg = actuator, cfg
         self.reference = 0.
         self.last_phase = 'idle'
         self.saturation_s = 0.
         self.torque_peak = self.power_peak = 0.
         self.work_J = 0.
 
-    def write(self, phase, data):
+    def command(self, phase, data):
+        """Write the servo reference for the coming step."""
         q, v = self.joint
         self.theta = float(data.qpos[q])
         self.start_omega = float(data.qvel[v])
@@ -129,6 +90,7 @@ class DynamicLeaf(Leaf):
         self.last_phase = phase
 
     def record(self, t, phase, data, ramp):
+        """After the step: the actuator torque while moving (drive load) or while standing."""
         q, v = self.joint
         self.theta = float(data.qpos[q])
         self.actual_omega = float(data.qvel[v])
@@ -152,19 +114,27 @@ class DynamicLeaf(Leaf):
         else:
             self.hold.append(abs(torque)/self.lever)
 
+    def sweep(self):
+        """Plan-view polygons of the part at angles from the present one back to home (<= 1 deg apart),
+        i.e. everything it will pass through while closing."""
+        n = max(2, int(math.ceil(abs(self.theta) / math.radians(1.))) + 1)
+        out = []
+        for th in np.linspace(self.theta, 0., n):
+            c, s = math.cos(th), math.sin(th)
+            out.append(self.piv + (self.parts - self.piv) @ np.array([[c, s], [-s, c]]))
+        return np.concatenate(out) if out else self.parts
+
+    def report(self):
+        return dict(peak_torque_Nm=self.torque_peak, peak_mechanical_power_W=self.power_peak,
+                    net_work_J=self.work_J, saturation_s=self.saturation_s,
+                    note='Finite torque servo and soft joint stops; uncalibrated carrier inertia and gains; not cylinder sizing.')
+
 
 class FaceRetract:
-    def __init__(self, cfg, d, dt, joint=None, actuator=None):
-        self.cfg, self.dt, self.joint = cfg, dt, joint        # joint = (qpos adr, dof adr) or None
-        parts, piv = face_parts(cfg, d)
-        # moment arm: the chord between the hinge and the far end -- NOT the polyline length, which for a
-        # curved face is longer than the straight distance the tip actually travels
-        self.dynamic = actuator is not None
-        leaf = DynamicLeaf if self.dynamic else Leaf
-        extra = dict(actuator=actuator, cfg=cfg) if self.dynamic else {}
-        self.face = leaf(joint, parts, piv, float(np.linalg.norm(d['P1'] - d['P0'])),
-                         math.radians(cfg['face_swing_deg']), cfg['face_swing_s'], cfg['face_force_max'],
-                         cfg['motor_slip'], dt, **extra)
+    """The retract phase machine on a face servo (FaceServo, or anything with its interface)."""
+
+    def __init__(self, cfg, servo):
+        self.cfg, self.face, self.dt = cfg, servo, servo.dt
         self.phase, self.t0 = 'idle', 0.
         self.hold_since = None                              # first entry into hold of the current action
         self.closed_on_empty, self.fault = None, None
@@ -179,12 +149,15 @@ class FaceRetract:
     lever = property(lambda self: self.face.lever)
     drive = property(lambda self: self.face.drive)
 
+    def _settled_at(self, angle):
+        """At `angle` and at rest, by the measured position and speed."""
+        F, c = self.face, self.cfg
+        return abs(F.theta - angle) <= c['face_position_tol'] and abs(F.actual_omega) <= c['face_velocity_tol']
+
     @property
     def at_home(self):
-        """A phase label alone is insufficient now that load can deflect the physical actuator."""
-        return self.phase == 'idle' and (not self.dynamic or
-            (abs(self.theta) <= self.cfg['face_position_tol']
-             and abs(getattr(self.face, 'actual_omega', 0.)) <= self.cfg['face_velocity_tol']))
+        """A phase label alone is insufficient: load can deflect the physical actuator."""
+        return self.phase == 'idle' and self._settled_at(0.)
 
     # ---- actions ------------------------------------------------------------------------------
     def start(self, t, **info):
@@ -201,19 +174,14 @@ class FaceRetract:
         self.events.append(dict(t_s=round(t, 2), **info, pauses=0))
 
     def command(self, t, data):
-        """Advance the phase machine and write the hinge positions/velocities for the coming step."""
-        if self.joint is None:
-            return
+        """Advance the phase machine and write the servo reference for the coming step."""
         c, F = self.cfg, self.face
         if self.phase == 'out':
-            F.omega = F.delta / F.swing_s
-            reached = (abs(F.theta-F.delta) <= c['face_position_tol']
-                       and abs(getattr(F, 'actual_omega', 0.)) <= c['face_velocity_tol']) if self.dynamic else abs(F.theta) >= abs(F.delta)
-            if reached or t - self.t0 > (6 if self.dynamic else 2) * F.swing_s:
+            reached = self._settled_at(F.delta)
+            if reached or t - self.t0 > 6 * F.swing_s:
                 F.reached = reached
-                F.omega = 0.
                 self.phase, self.t0, self.hold_since = 'hold', t, t
-                if self.dynamic and not reached:
+                if not reached:
                     self.fault = dict(t_s=round(t, 3), reason='retract_not_reached',
                                       angle_deg=math.degrees(F.theta))
                     self.phase = 'fault'
@@ -222,26 +190,17 @@ class FaceRetract:
         elif self.phase == 'back' and self.in_sweep:
             # a lump has come into the path while closing: stop pushing, wait retracted again
             self.phase, self.t0 = 'hold', t
-            F.omega = 0.
             self.events[-1]['pauses'] += 1
         if self.phase == 'back':
-            F.omega = -math.copysign(abs(F.delta) / F.swing_s, F.theta) if F.theta else 0.
-            home = (abs(F.theta) <= c['face_position_tol']
-                    and abs(getattr(F, 'actual_omega', 0.)) <= c['face_velocity_tol']) if self.dynamic else abs(F.theta) < 1e-4
-            if home and not self.dynamic:
-                F.theta, F.omega = 0., 0.
-            if home:
+            if self._settled_at(0.):
                 self.phase = 'idle'
             elif t - self.t0 > 6 * F.swing_s:
                 self.fault = dict(t_s=round(t, 2), reason='reset_not_reached', angle_deg=round(math.degrees(F.theta), 2))
                 self.phase = 'fault'
-                F.omega = 0.
-        F.write(self.phase, data)
+        F.command(self.phase, data)
 
     def record(self, t, data):
-        """After the step: hinge moment of the face."""
-        if self.joint is None:
-            return
+        """After the step: the actuator torque on the face."""
         self.face.record(t, self.phase, data, self.cfg['ramp'])
 
     # ---- observation --------------------------------------------------------------------------
@@ -249,7 +208,7 @@ class FaceRetract:
         """plans: {lump id: plan-view points}. Records which lumps reach into the face's closing sweep
         (within MOTION_CLEARANCE); checked only while the face is out of its home position."""
         self.in_sweep = []
-        if self.joint is None or self.phase not in ('hold', 'back') or not len(self.face.parts):
+        if self.phase not in ('hold', 'back') or not len(self.face.parts):
             return self.in_sweep
         P = self.face.sweep()
         lo, hi = P.reshape(-1, 2).min(0) - MOTION_CLEARANCE, P.reshape(-1, 2).max(0) + MOTION_CLEARANCE
@@ -284,30 +243,23 @@ class FaceRetract:
     def report(self):
         if self.events and 'reached_full_angle' not in self.events[-1]:
             self.events[-1].update(self.action_summary())
-        moving = self.joint is not None
         face = self.face
         hold = load_stats([-x for x in face.hold], self.dt)
         return dict(
-            face_drive_model='dynamic' if self.dynamic else 'kinematic',
-            face_actuator=(dict(peak_torque_Nm=face.torque_peak, peak_mechanical_power_W=face.power_peak,
-                                net_work_J=face.work_J, saturation_s=face.saturation_s,
-                                note='Finite torque servo and soft joint stops; uncalibrated carrier inertia and gains; not cylinder sizing.')
-                           if self.dynamic else None),
+            face_drive_model='dynamic',
+            face_actuator=face.report(),
             face_hinge_moment_over_chord=(dict(
-                note=('applied actuator torque / chord (includes inertia); no independent hard-stop reaction measurement. '
-                      if self.dynamic else 'hinge constraint moment / chord: the moment referred to the free end. Not '
-                     'the contact force on the face, not a cylinder force; the face is a '
-                     'kinematically driven joint with no modelled stop or frame stiffness. '
-                     '50 ms averages are model diagnostics, not design loads'),
+                note='applied actuator torque / chord (includes inertia); no independent hard-stop reaction '
+                     'measurement. ',
                 hold_avg50ms_max_N=hold['resist_avg50ms_max_N'], hold_peak_step_N=hold['resist_peak_step_N'],
                 stroke_out=load_stats(face.by_phase['out'], self.dt, self.cfg['face_force_max']),
                 stroke_back=load_stats(face.by_phase['back'], self.dt, self.cfg['face_force_max']))
-                if moving and face.hold else None),
+                if face.hold else None),
             face_contact=dict(contact_s=round(self.all_contact_s, 2),
                               peak_sample_total_normal_N=round(self.all_contact_max_N, 1),
                               note='sum of lump-face contact normal forces, sampled every '
                                    '10 ms; the peak sample is impulsive, not a design load'),
             face_closed_on_empty=self.closed_on_empty,
             face_fault=self.fault,
-            face_last_action=(dict(self.action_summary(), phase=self.phase,
-                                   final_angle_deg=round(math.degrees(face.theta), 2)) if moving else None))
+            face_last_action=dict(self.action_summary(), phase=self.phase,
+                                  final_angle_deg=round(math.degrees(face.theta), 2)))

@@ -1,4 +1,5 @@
 """Material bookkeeping, compiled mass and scope regression; not feed calibration."""
+import hashlib
 import json
 import sys
 import tempfile
@@ -36,19 +37,29 @@ class MaterialChecks(unittest.TestCase):
             self.assertAlmostEqual(b['weight_N'], actual * 9.81, places=3)
             self.assertTrue(np.all(model.body_inertia[model.body('b%d' % k).id] > 0))
 
-    def test_geometry_layout_and_repeatability(self):
-        new = self.cfg()
-        old = dict(new, material_model='legacy_binary')
-        for seed in range(10):
-            r1, r2 = np.random.default_rng(seed), np.random.default_rng(seed)
-            b1, b2 = lumps.make_blocks(new, r1), lumps.make_blocks(old, r2)
-            for a, b in zip(b1, b2):
-                np.testing.assert_array_equal(a['vertices'], b['vertices'])
-            l1 = lumps.plan_scatter(new, b1, r1, machine.derive(new))
-            l2 = lumps.plan_scatter(old, b2, r2, machine.derive(old))
-            self.assertEqual(l1, l2)
-            again = lumps.make_blocks(new, np.random.default_rng(seed))
-            self.assertEqual([b['composition'] for b in b1], [b['composition'] for b in again])
+    # sha256 (first 16 hex digits) of the default batch of a seed: every lump's vertices, material, density and
+    # mass, and the scatter layout, rounded to 1e-9. Recorded on 2026-10-05 from the code of the S7 baseline
+    # (source 400e934d). A seed means the same batch only as long as these hold: every result in EXPERIMENTS.md
+    # is tied to its seeds. If this fails after a change to lumps.py or to numpy's generator, either undo the
+    # change to the random stream or accept that old seeds no longer reproduce, and say so in EXPERIMENTS.md.
+    BATCH = {0: 'bda837ef3d19518b', 1: '693bf5a13053e71f', 392: '2078a34fdf5245a8', 7004: '6bb8c5db1b0ac0f2',
+             7101: '07c66be10fed4a6d'}
+
+    def test_a_seed_is_the_same_batch_as_before(self):
+        cfg = self.cfg()
+        d = machine.derive(cfg)
+        for seed, want in self.BATCH.items():
+            rng = np.random.default_rng(seed)
+            blocks = lumps.make_blocks(cfg, rng)
+            layer, _, _ = lumps.plan_scatter(cfg, blocks, rng, d)
+            h = hashlib.sha256()
+            for b in blocks:
+                h.update((np.round(b['vertices'], 9) + 0.).tobytes())
+                h.update(('%s %.9f %.9f' % (b['material'], b['density'], b['mass_kg'])).encode())
+            h.update((np.round(np.array(layer, float), 9) + 0.).tobytes())
+            self.assertEqual(h.hexdigest()[:16], want, 'seed %d' % seed)
+            again = lumps.make_blocks(cfg, np.random.default_rng(seed))
+            self.assertEqual([b['composition'] for b in blocks], [b['composition'] for b in again])
 
     def test_category_extremes_and_invalid_settings(self):
         for g, mid, expected in ((1., 0., 'gangue'), (0., 1., 'middlings'), (0., 0., 'coal')):

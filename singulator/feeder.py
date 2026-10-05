@@ -69,7 +69,7 @@ region instead of by track id -- see _observe_vision. --sensing oracle makes the
 included. What is still open about feeding by camera is listed in TODO.md.
 
 A blob -- lumps lying against each other, one object to the cameras -- is led by its FRONT EDGE, not by its outline
-centroid (--blob-lead front, the default since 2026-10-04; see _lead_x). The lump in front of a blob has its centroid
+centroid (since 2026-10-04; see _lead_x). The lump in front of a blob has its centroid
 0.2-0.5 m ahead of the blob's. Staging the blob's centroid at the creep zone therefore ran the lump in front over
 the edge at full feed speed while no release was on: nothing had judged whether the funnel was clear for it, and it
 was booked to the release before (EXPERIMENTS.md S6). Led by the front edge a blob is staged with its front at the
@@ -190,7 +190,6 @@ class Feeder:
         self.lumps_went = set()                         # vision: true lumps over the edge (verification)
         self.miss_streak = 0                            # released lumps in a row that passed the beam unseen
         self.across_hist = []                           # vision: (t, centroid x of the most advanced object across the edge)
-        self.blob_lead = cfg.get('blob_lead', 'front')  # vision: a blob is led by its front edge (see _lead_x)
         self.nose_min = NOSE_SHARE * cfg.get('size_min', .30)
         self.blobs, self.blob_run = set(), {}           # vision: track ids that may hold several lumps (_mark_blobs)
         self.staged = False                             # the belt was run for staging since the last release stopped
@@ -489,8 +488,8 @@ class Feeder:
         """Vision: how far forward the centroid of the leading lump in object o can be. One lump: its outline
         centroid. A blob (_mark_blobs): the cameras cannot see which lump is in front or how long it is, only
         that its centroid lies at least nose_min behind the blob's front edge. Until 2026-10-04 a blob was led by
-        its own centroid (--blob-lead centroid, kept for comparison)."""
-        if self.blob_lead == 'front' and o.get('tid') in self.blobs:
+        its own centroid: staging it then ran the lump in front over the edge with no release decided."""
+        if o.get('tid') in self.blobs:
             return max(o['cx'], o['x1'] - self.nose_min)
         return o['cx']
 
@@ -508,7 +507,7 @@ class Feeder:
     def _sure(self, view):
         """Vision only: every object between STAGE_REACH behind the head edge and the lane entry is seen now
         with CONF_OK or better. One the cameras are unsure of holds the release and the staging. A blob still on
-        the feed belt is the exception (--blob-lead front): what is in doubt about it is how many lumps it holds,
+        the feed belt is the exception: what is in doubt about it is how many lumps it holds,
         not where it is, and it is led by its front edge whatever the count. It only has to be SEEN (conf_seen,
         the confidence without the shape term); otherwise the feed belt would wait for as long as the blob looks
         neither like one lump nor like two."""
@@ -516,7 +515,7 @@ class Feeder:
         for o in view.values():
             if not (o['x1'] > x1 - STAGE_REACH and o['x0'] < self.lane_in):
                 continue
-            blob = self.blob_lead == 'front' and o.get('tid') in self.blobs and o['cx'] <= x1 + WENT_MARGIN
+            blob = o.get('tid') in self.blobs and o['cx'] <= x1 + WENT_MARGIN
             if o.get('coasting') or (o.get('conf_seen', o['conf']) if blob else o['conf']) < CONF_OK:
                 return False
         return True

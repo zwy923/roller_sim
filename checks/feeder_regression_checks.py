@@ -365,10 +365,8 @@ class VisionRelease(unittest.TestCase):
         f, front = self.staged_blob(CFGV)
         self.assertAlmostEqual(front - nose, stop, delta=.002)        # the furthest its leading centroid can be
         self.assertLess(front - .20, X)                               # a 0.40 m lump in front has not gone
-        g, front_c = self.staged_blob(parse_config(['--feeder-sensing', 'vision', '--blob-lead', 'centroid',
-                                                    '--no-video']))
-        self.assertAlmostEqual(front_c - .35, stop, delta=.002)       # as before: the blob's centroid at the zone ...
-        self.assertGreater(front_c - .20, X + feeder.WENT_MARGIN)     # ... and that lump is over the edge
+        # led by its centroid (0.35 m behind the front of this blob) it would have been staged 0.25 m further on
+        self.assertGreater(stop + .35 - .20, X + feeder.WENT_MARGIN)  # ... with that lump over the edge
 
     def test_a_release_creeps_a_blob_from_its_front_edge_to_the_beam(self):
         f, front = self.staged_blob(CFGV)
@@ -402,14 +400,15 @@ class VisionRelease(unittest.TestCase):
 
     def test_a_blob_of_uncertain_count_does_not_hold_the_release(self):
         """Its shape says neither one lump nor two (confidence halved), but it is seen well (conf_seen). Led by
-        its front edge it needs no count. Led by its centroid it held the release for as long as it looked so."""
-        for lead, back, releases in (('front', feeder.NOSE_SHARE * CFGV['size_min'], 2), ('centroid', .35, 1)):
-            with self.subTest(blob_lead=lead):
-                f = Feeder(parse_config(['--feeder-sensing', 'vision', '--blob-lead', lead, '--no-video']), DV, 3)
+        its front edge it needs no count. (Led by its centroid, until 2026-10-04, it held the release for as long
+        as it looked so.) One that is not seen well does hold it."""
+        for conf_seen, releases in ((1., 2), (.3, 1)):
+            with self.subTest(conf_seen=conf_seen):
+                f = Feeder(CFGV, DV, 3)
                 f.start(0.)
                 f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)
-                front = X - feeder.CREEP_ZONE - feeder.STAGE_STOP + back      # staged, by either rule
-                blob = vblob(9, front - .70, front, solid=.93, n_est=1, conf=.5)
+                front = X - feeder.CREEP_ZONE - feeder.STAGE_STOP + feeder.NOSE_SHARE * CFGV['size_min']    # staged
+                blob = vblob(9, front - .70, front, solid=.93, n_est=1, conf=.5 * conf_seen, conf_seen=conf_seen)
                 for i in range(1, 6):
                     f.observe(1. + i * .01, {6: self.FAR, 9: blob}, False, True)
                 self.assertEqual(len(f.releases), releases)

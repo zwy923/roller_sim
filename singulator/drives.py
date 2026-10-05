@@ -4,24 +4,20 @@ import math
 import numpy as np
 
 
-def make_motor(limited, force_max, mass, v_ref, slip):
+def make_motor(force_max, mass, v_ref, slip):
     """A drive reduced to one speed factor f (1 = rated speed) with a force limit and reflected inertia.
 
     Force is the equivalent tangential force at the reference surface speed v_ref. Below the limit the
     speed droops by at most `slip` (stiff induction-motor-like line); above it the drive decelerates and,
-    being non-backdrivable, stops at f = 0 instead of reversing. limited=False reproduces the old
-    kinematic drive (f follows the ramp exactly, unlimited force).
+    being non-backdrivable, stops at f = 0 instead of reversing.
     """
-    return dict(limited=bool(limited), F_max=float(force_max), M_eff=float(mass) * v_ref, v_ref=v_ref,
+    return dict(F_max=float(force_max), M_eff=float(mass) * v_ref, v_ref=v_ref,
                 gain=float(force_max) / float(slip), f=0., stall_s=0., min_ratio=1., loads=[],
                 brake_overload_s=0., contact_power_peak_W=0., contact_work_J=0.)
 
 
 def motor_update(m, f_target, load, dt):
     """Advance the speed factor one step. load = contact force on the drive at v_ref (negative resists)."""
-    if not m['limited']:
-        m['f'] = f_target
-        return
     a = dt / m['M_eff']
     # implicit in the proportional term, so a very stiff (or effectively unlimited) drive stays stable
     f_new = (m['f'] + a * (m['gain'] * f_target + load)) / (1 + a * m['gain'])
@@ -37,9 +33,6 @@ def brake_update(m, load, dt):
     Integrate inertia before applying the brake impulse. Hold exactly at rest only within capacity;
     an overload can drag the belt in either direction. Never teleport speed to zero.
     """
-    if not m['limited']:
-        m['f'] = 0.
-        return
     free = m['f'] + dt*load/m['M_eff']
     impulse = dt*m['F_max']/m['M_eff']
     m['f'] = math.copysign(max(0., abs(free)-impulse), free)
@@ -98,14 +91,14 @@ class Conveyors:
         self.main_q, self.main_dof = model.jnt_qposadr[jid('mfloorj')], model.jnt_dofadr[jid('mfloorj')]
         self.side_q = np.array([model.jnt_qposadr[jid('vj%d' % i)] for i in range(d['n_sbslat'])], dtype=int)
         self.side_dofs = np.array([model.jnt_dofadr[jid('vj%d' % i)] for i in range(d['n_sbslat'])], dtype=int)
-        lim, mass, slip = cfg['drive_limit'], cfg['belt_mass'], cfg['motor_slip']
-        self.main = make_motor(lim, cfg['belt_force_max'], mass, cfg['v_belt'], slip)
-        self.side = make_motor(lim, cfg['side_belt_force_max'], mass / 4, max(d['v_side'], 1e-6), slip)
+        mass, slip = cfg['belt_mass'], cfg['motor_slip']
+        self.main = make_motor(cfg['belt_force_max'], mass, cfg['v_belt'], slip)
+        self.side = make_motor(cfg['side_belt_force_max'], mass / 4, max(d['v_side'], 1e-6), slip)
         self.side_base = np.arange(d['n_sbslat']) * SIDE_BELT['pitch']
         self.side_travel = 0.
         self.pulleys = []                          # (dof, radius, 'feed' / 'main'): head drum, tail pulley below
         self.feed_q, self.feed_dof = model.jnt_qposadr[jid('feederj')], model.jnt_dofadr[jid('feederj')]
-        self.feed = make_motor(lim, cfg['feeder_force_max'], mass / 2, d['feeder']['speed_m_s'], slip)
+        self.feed = make_motor(cfg['feeder_force_max'], mass / 2, d['feeder']['speed_m_s'], slip)
         self.feed_target = 0.
         hd = d['feeder'].get('head') or {}
         for j, dia, who in (('fdrumj', hd.get('drum_d_m'), 'feed'), ('mtailj', hd.get('tail_d_m'), 'main')):
@@ -116,7 +109,7 @@ class Conveyors:
         from .station import FORCE_MAX
         for name, body, attr, v in (('buffer_belt', 'bbeltj', 'buffer_target', d['station']['buffer_speed_m_s']),
                                     ('measure_belt', 'mbeltj', 'measure_target', d['station']['speed_m_s'])):
-            self.station.append((name, make_motor(lim, FORCE_MAX, mass / 4, v, slip),
+            self.station.append((name, make_motor(FORCE_MAX, mass / 4, v, slip),
                                  model.jnt_qposadr[jid(body)], model.jnt_dofadr[jid(body)], attr))
             setattr(self, attr, 0.)
 

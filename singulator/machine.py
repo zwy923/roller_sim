@@ -42,9 +42,7 @@ def derive(cfg):
     one bent plate and the lane is a parallel channel of width lane_w.
     """
     # Reject combinations that used to build a silently nonsensical machine (negative diagonal, a lane
-    # wider than the belt, a plough that runs backwards). The S model has checks.py; these are the plough's.
-    if not 0. < cfg['skew_deg'] < 90.:
-        raise ValueError('--skew-deg must be inside (0, 90), got %g' % cfg['skew_deg'])
+    # wider than the belt, a plough that runs backwards).
     if cfg['lane_w'] <= 0.:
         raise ValueError('--lane-w must be > 0, got %g' % cfg['lane_w'])
     if cfg['lane_y'] < 0. or cfg['lane_y'] + cfg['lane_w'] >= cfg['belt_w']:
@@ -52,48 +50,33 @@ def derive(cfg):
                          ' otherwise there is nothing for the face to sweep and the diagonal runs backwards'
                          % (cfg['lane_y'], cfg['lane_y'] + cfg['lane_w'], cfg['belt_w']))
     lane_top = cfg['lane_y'] + cfg['lane_w']
-    P0 = np.array([cfg['plough_x'], cfg['belt_w'], 0.])       # high end of the diagonal
-    if cfg['face_shape'] == 'curve':
-        # The face turns linearly (in angle) from curve_top at the belt edge to curve_exit at the
-        # lane: abreast pairs are sheared apart on the steep top, and the lane is handed lumps at
-        # curve_exit instead of skew_deg, leaving at crawl v*cos^2(curve_exit) -- 0.30 m/s at 30 deg
-        # against 0.132 at 55. The price is the stagger budget, integral tan(beta) dy over the sweep:
-        # 0.48 m at 55->25 and 0.58 m at 60->30, against 0.785 m for the straight 55 deg face.
-        if not 0. < cfg['curve_exit_deg'] < cfg['curve_top_deg'] < 90.:
-            raise ValueError('curved face needs 0 < curve-exit-deg < curve-top-deg < 90, got top %g exit %g'
-                             % (cfg['curve_top_deg'], cfg['curve_exit_deg']))
-        # Polyline of FACE_SEGS boxes: segment angles run exactly top -> exit, each dropping an equal
-        # share of the y sweep, so the last box really is at curve_exit_deg and the face ends on y =
-        # lane_top (the lane's outer wall continues from there).
-        b_seg = np.radians(np.linspace(cfg['curve_top_deg'], cfg['curve_exit_deg'], FACE_SEGS))
-        dy = (cfg['belt_w'] - lane_top) / FACE_SEGS
-        xs = [cfg['plough_x']]
-        ys = [cfg['belt_w']]
-        for b in b_seg:
-            xs.append(xs[-1] + dy / math.tan(b))
-            ys.append(ys[-1] - dy)
-        face_pts = [np.array([x, y, 0.]) for x, y in zip(xs, ys)]
-        P1 = face_pts[-1]
-        s_end = float(np.sum(dy / np.sin(b_seg)))
-        stagger = float(np.sum(dy * np.tan(b_seg)))
-        transit = float(np.sum(dy / (cfg['v_belt'] * np.sin(b_seg) * np.cos(b_seg))))
-        beta = math.radians(cfg['curve_top_deg'])
-        beta_exit = math.radians(cfg['curve_exit_deg'])
-    else:
-        beta = math.radians(cfg['skew_deg'])
-        beta_exit = beta
-        face_pts = None
-        s_end = (cfg['belt_w'] - lane_top) / math.sin(beta)
-        stagger = (cfg['belt_w'] - lane_top) * math.tan(beta)
-        # a lump on the face moves along it at v*cos(beta), so dy/dt = -v*sin(beta)*cos(beta) and the
-        # transit over the whole sweep is sweep / (v sin b cos b). Arc length / (v cos b) gives the same
-        # number; dividing s_end by (v sin b cos b) instead leaves an extra 1/sin(b) -- 22 % too long at
-        # 55 deg, and it made the straight face look slower across the face than it is.
-        transit = (cfg['belt_w'] - lane_top) / (cfg['v_belt'] * math.sin(beta) * math.cos(beta))
-    f = np.array([math.cos(beta), -math.sin(beta), 0.])       # along the face, downstream (at the top)
-    n = np.array([math.sin(beta), math.cos(beta), 0.])        # away from the material
-    if face_pts is None:
-        P1 = P0 + s_end * f                                   # the bend: diagonal -> lane outer wall
+    P0 = np.array([cfg['plough_x'], cfg['belt_w'], 0.])       # high end of the face
+    # The face turns linearly (in angle) from curve_top at the belt edge to curve_exit at the lane: abreast
+    # pairs are sheared apart on the steep top, and the lane is handed lumps at curve_exit, leaving at crawl
+    # v*cos^2(curve_exit) -- 0.30 m/s at 30 deg against 0.132 at 55. The price is the stagger budget, integral
+    # tan(beta) dy over the sweep: 0.48 m at 55->25 and 0.58 m at 60->30, against 0.785 m for a straight
+    # 55 deg face (the straight face was an option until 2026-10-05).
+    if not 0. < cfg['curve_exit_deg'] < cfg['curve_top_deg'] < 90.:
+        raise ValueError('curved face needs 0 < curve-exit-deg < curve-top-deg < 90, got top %g exit %g'
+                         % (cfg['curve_top_deg'], cfg['curve_exit_deg']))
+    # Polyline of FACE_SEGS boxes: segment angles run exactly top -> exit, each dropping an equal share of the
+    # y sweep, so the last box really is at curve_exit_deg and the face ends on y = lane_top (the lane's outer
+    # wall continues from there).
+    b_seg = np.radians(np.linspace(cfg['curve_top_deg'], cfg['curve_exit_deg'], FACE_SEGS))
+    dy = (cfg['belt_w'] - lane_top) / FACE_SEGS
+    xs = [cfg['plough_x']]
+    ys = [cfg['belt_w']]
+    for b in b_seg:
+        xs.append(xs[-1] + dy / math.tan(b))
+        ys.append(ys[-1] - dy)
+    face_pts = [np.array([x, y, 0.]) for x, y in zip(xs, ys)]
+    P1 = face_pts[-1]                                         # the bend: face -> lane outer wall; the hinge
+    s_end = float(np.sum(dy / np.sin(b_seg)))
+    stagger = float(np.sum(dy * np.tan(b_seg)))
+    # a lump on the face moves along it at v*cos(beta), so dy/dt = -v*sin(beta)*cos(beta)
+    transit = float(np.sum(dy / (cfg['v_belt'] * np.sin(b_seg) * np.cos(b_seg))))
+    beta = math.radians(cfg['curve_top_deg'])
+    beta_exit = math.radians(cfg['curve_exit_deg'])
     exit_x = P1[0] + cfg['lane_len']
     # the batch starts on the feed belt, which ends feeder_gap before the plough start; the conveying surface
     # begins at its tail end
@@ -114,23 +97,21 @@ def derive(cfg):
     # the face beats the friction opposing it); above that it locks and the belt runs under it. Lining the
     # face with UHMW-PE (0.20) moves the ceiling from 65.8 to 78.7 deg.
     lock = math.tan(beta) * cfg['friction_steel']
-    d = dict(beta=beta, beta_exit=beta_exit, face_pts=face_pts, f=f, n=n, P0=P0, P1=P1, s_end=s_end,
+    d = dict(face_pts=face_pts, P0=P0, P1=P1,
                 lane_top=lane_top, exit_x=exit_x, final_x=final_x,
                 belt_x0=x0, belt_x1=x1, feeder=fd, station=st,
                 # a lump whose lowest point falls below drop_z has left the machine (tracking.landing says where)
                 drop_z=st['drop_z'], end_states=('sorted', 'dropped', 'taken_off'), view_x1=st['end_x'] + .3,
                 sb_x0=sb_x0, sb_chain=sb_chain, n_sbslat=n_sbslat, v_side=v_side,
-                report=dict(skew_deg=cfg['skew_deg'],
-                            face_shape=cfg['face_shape'], face_kind=cfg['face_kind'],
-                            curve_top_deg=(cfg['curve_top_deg'] if cfg['face_shape'] == 'curve' else None),
-                            curve_exit_deg=(cfg['curve_exit_deg'] if cfg['face_shape'] == 'curve' else None),
+                report=dict(face_shape='curve', face_kind=cfg['face_kind'],
+                            curve_top_deg=cfg['curve_top_deg'], curve_exit_deg=cfg['curve_exit_deg'],
                             face_transit_s=round(transit, 2),
                             belt_width_m=cfg['belt_w'],
                             lane_y_m=cfg['lane_y'], lane_width_m=cfg['lane_w'], lane_length_m=cfg['lane_len'],
                             diagonal_length_m=s_end, diagonal_from=[float(P0[0]), float(P0[1])],
                             bend_at=[float(P1[0]), float(P1[1])], exit_plane_x_m=exit_x,
                             sweep_m=sweep, belt_speed_m_s=cfg['v_belt'],
-                            # the four speeds below are at the lane handoff (curve_exit for a curved face)
+                            # the four speeds below are at the lane handoff (curve_exit)
                             along_face_speed_m_s=cfg['v_belt'] * math.cos(beta_exit),
                             face_crawl_speed_m_s=cfg['v_belt'] * math.cos(beta_exit) ** 2,
                             face_lateral_speed_m_s=cfg['v_belt'] * math.sin(beta_exit) * math.cos(beta_exit),
@@ -151,9 +132,9 @@ def derive(cfg):
                                            length_m=(x1 - sb_x0) if cfg['side_belt'] else 0.,
                                            speed_m_s=v_side if cfg['side_belt'] else None,
                                            ratio_to_main=cfg['side_belt_ratio'], slats=n_sbslat),
-                            feed_band=cfg['feed_band'], layout=cfg['layout'],
+                            feed_band='full', layout=cfg['layout'],
                             lumps_per_batch=cfg['count'],
-                            unjam=dict(on=bool(cfg['unjam']), face_hinge=cfg['face_hinge'],
+                            unjam=dict(on=True, face_hinge='bend',
                                        face_swing_deg=cfg['face_swing_deg'],
                                        face_force_max_N=cfg['face_force_max'],
                                        hold_timeout_action='stop the batch with the face still retracted; '
@@ -180,8 +161,7 @@ def face_roller_centres(d, pitch, r):
     Pre-2026-09-22 builds counted from the top end instead: the bottom roller then ended 48 mm above the
     wall line and the bare wall corner at P1 stood in the lane mouth.
     """
-    pts = (np.array(d['face_pts'])[:, :2] if d['face_pts'] is not None
-           else np.array([d['P0'][:2], d['P1'][:2]]))
+    pts = np.array(d['face_pts'])[:, :2]
     seg = np.diff(pts, axis=0)
     ln = np.linalg.norm(seg, axis=1)
     s = np.concatenate([[0.], np.cumsum(ln)])
@@ -197,31 +177,29 @@ def face_roller_centres(d, pitch, r):
     return out
 
 
-def face_swing_outline(cfg, d):
-    """Plan-view outline points of the face parts that move or spin, at every sampled swing angle.
+def face_plate_segments(d):
+    """The plate face (--face-kind plate) as plan-view quadrilaterals, one per segment of the face polyline:
+    the material face on the polyline, the plate on its far (+n) side."""
+    out = []
+    for A, Bp in zip(d['face_pts'][:-1], d['face_pts'][1:]):
+        u = (Bp - A)[:2] / np.linalg.norm((Bp - A)[:2])
+        off = np.array([-u[1], u[0]]) * PLOUGH['thickness']
+        out.append(np.array([A[:2], Bp[:2], Bp[:2] + off, A[:2] + off]))
+    return out
 
-    Rollers always count (each spins on its own axis, so even a static roller face must clear the walls).
-    The plate counts only when it swings: a static plate and the lane wall are one bent plate.
-    """
-    pts = []
+
+def face_swing_outline(cfg, d):
+    """Plan-view outline points of the face (its rollers, or its plate) at every sampled swing angle about the
+    hinge at the bend."""
     if cfg['face_kind'] == 'rollers':
         R = FACE_ROLLER['d'] / 2
         a = np.linspace(0., 2 * math.pi, 48, endpoint=False)
         ring = R * np.stack([np.cos(a), np.sin(a)], 1)
         pts = [c + ring for c in face_roller_centres(d, FACE_ROLLER['pitch'], R)]
-    elif cfg['unjam']:
-        segs = (list(zip(d['face_pts'][:-1], d['face_pts'][1:])) if d['face_pts'] is not None
-                else [(d['P0'], d['P1'])])
-        for A, Bp in segs:
-            u = (Bp - A)[:2] / np.linalg.norm((Bp - A)[:2])
-            off = np.array([-u[1], u[0]]) * PLOUGH['thickness']      # the plate lies on the +n side
-            pts.append(np.array([A[:2], Bp[:2], Bp[:2] + off, A[:2] + off]))
-    if not pts:
-        return np.zeros((0, 2))
+    else:
+        pts = face_plate_segments(d)
     P = np.concatenate(pts)
-    if not cfg['unjam']:
-        return P
-    piv = (d['P0'] if cfg['face_hinge'] == 'upstream' else d['P1'])[:2]
+    piv = d['P1'][:2]
     out = []
     for th in np.radians(np.linspace(0., cfg['face_swing_deg'], 51)):
         c, s = math.cos(th), math.sin(th)
@@ -230,23 +208,16 @@ def face_swing_outline(cfg, d):
 
 
 def face_parts(cfg, d, sides=16):
-    """The face's moving parts at rest as convex plan-view polygons, and the hinge point. Rollers are
-    circumscribed polygons (never smaller than the roller); the plate counts only when it swings."""
-    parts = []
+    """The face's moving parts at rest as convex plan-view polygons, and the hinge point (the bend). Rollers are
+    circumscribed polygons (never smaller than the roller)."""
     if cfg['face_kind'] == 'rollers':
         R = FACE_ROLLER['d'] / 2 / math.cos(math.pi / sides)
         a = np.linspace(0., 2 * math.pi, sides, endpoint=False)
         ring = R * np.stack([np.cos(a), np.sin(a)], 1)
         parts = [c + ring for c in face_roller_centres(d, FACE_ROLLER['pitch'], FACE_ROLLER['d'] / 2)]
-    elif cfg['unjam']:
-        segs = (list(zip(d['face_pts'][:-1], d['face_pts'][1:])) if d['face_pts'] is not None
-                else [(d['P0'], d['P1'])])
-        for A, Bp in segs:
-            u = (Bp - A)[:2] / np.linalg.norm((Bp - A)[:2])
-            off = np.array([-u[1], u[0]]) * PLOUGH['thickness']
-            parts.append(np.array([A[:2], Bp[:2], Bp[:2] + off, A[:2] + off]))
-    piv = (d['P0'] if cfg['face_hinge'] == 'upstream' else d['P1'])[:2]
-    return (np.array(parts) if parts else np.zeros((0, 4, 2))), np.array(piv, float)
+    else:
+        parts = face_plate_segments(d)
+    return np.array(parts), np.array(d['P1'][:2], float)
 
 
 def motion_windows(cfg, d):

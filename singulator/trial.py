@@ -71,10 +71,10 @@ def _extent(model, data, L, yaw):
 
 
 def arrange(cfg, d, model, data, lumps, rng):
-    """Lay the batch on the feed belt in the bench layout cfg['layout'] (scatter / rows / flat: keep the layout
+    """Lay the batch on the feed belt in the bench layout cfg['layout'] (scatter / flat: keep the layout
     already placed; flat lumps come from make_blocks). Returns a description."""
     case = cfg['layout']
-    if case in ('scatter', 'rows', 'flat'):
+    if case in ('scatter', 'flat'):
         return dict(case=case)
     fd = d['feeder']
     h, x1 = fd['step_m'], fd['x1']
