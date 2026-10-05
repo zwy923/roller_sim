@@ -1,7 +1,7 @@
 """Standalone hinged coal/gangue diverter: renders, interactive viewer, checks.json. SI units.
 
-The geometry (Config, build, state, verify, material_clearance) lives in singulator/separator.py, shared
-with the line (singulator/station.py), which embeds the same parts behind the measuring belt.
+The geometry (Config, build, state, verify, material_clearance) lives in singulator/machine/separator.py, shared
+with the line (singulator/machine/station.py), which embeds the same parts behind the measuring belt.
 The preview prescribes consistent joint positions (kinematics, not a load test).
 """
 from __future__ import annotations

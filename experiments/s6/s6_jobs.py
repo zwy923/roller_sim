@@ -7,9 +7,14 @@ lumps and a 200 s limit, as in S4. Every configuration gets the same seeds and l
 are ordered by seed, so that at any time every configuration has been through about the same batches.
 
 Two rounds. The first (ROUND1) ran on the code as it was at 18:29 on 2026-10-04: its batches found the tracker losing
-a blob's lineage, so the second round ran on the code with that fixed and the two station rules as options. From
-today's code a first-round configuration is run with the lineage fix switched off (SET), which is the same program.
+a blob's lineage, so the second round ran on the code with that fixed and the two station rules as options.
 --root names a snapshot of the code next to the job list (how the two rounds were run side by side).
+
+A first-round configuration can only be run on a snapshot (--root ../snapshots/candidate2 or candidate3, which still
+have the switches): it needs the tracker as it was before the lineage and ghost fixes (SET: SPLIT_PAD / GHOST_S =
+None) and, for 'before' and 'centroid', --blob-lead centroid. Those switches were comparisons with fixed bugs and
+were removed from the code on 2026-10-05; the second-round configurations run on today's code. SET names the
+constants by their module path of 2026-10-04; s6_run.py finds them where they live now.
 
 The line's defaults changed on 2026-10-05 (the baseline of S7: 0.60 m lane, the feed belt reads true centroids, the
 measuring device takes a fixed second). Every S6 batch ran on the line of the day before, so each job names that
@@ -68,7 +73,7 @@ CONFIGS = {
 }
 ROUND1 = ('base', 'before', 'centroid', 'ghost', 'oracle', 'lane_rule', 'lane58', 'lane62', 'no_side_belt',
           'plate_face', 'buffer_slow', 'drum_head')
-# module constants changed for a configuration (s6_run.py applies them in the job's process)
+# module constants changed for a configuration (s6_run.py applies them to the job's run)
 NO_LINEAGE = {'singulator.perception.SPLIT_PAD': None}      # the pieces of a parted blob are new objects (round 1)
 GHOSTS_COUNT = {'singulator.perception.GHOST_S': None}      # ghosts add to a merge's count (before 2026-10-04)
 WEIGH_5S = {'singulator.station.WEIGH_MAX_S': 5.}
@@ -83,6 +88,10 @@ SET.update(weigh5=WEIGH_5S, robust=WEIGH_5S, robust_b12=WEIGH_5S, robust_b16=WEI
 
 def jobs(groups, layouts=LAYOUTS, root=None, line=S6_LINE):
     """groups: [(config names, seeds)]. Ordered by seed, then layout, then configuration."""
+    old = sorted({c for configs, _ in groups for c in configs if c in ROUND1})
+    if old and not root:
+        raise ValueError('%s: first-round configurations run only on a snapshot of 2026-10-04 (--root); see the '
+                         'module docstring' % ', '.join(old))
     out = []
     for seed in sorted({s for _, seeds in groups for s in seeds}):
         for lay in layouts:
