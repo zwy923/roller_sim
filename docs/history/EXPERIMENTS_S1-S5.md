@@ -1,6 +1,6 @@
 # S1–S5 历史实验记录
 
-[返回实验总览](../EXPERIMENTS.md) · [S6 对比记录](../../experiments/s6/REPORT.md) · [当前 S7 记录](../../experiments/s7/REPORT.md)
+[返回实验总览](../EXPERIMENTS.md) · [S6 历史记录](EXPERIMENTS_S6.md) · [当前 S7 记录](../../experiments/s7/REPORT.md)
 
 保留 2026-09-24 至 10-01 的原表格、分析与当时的待办；这里的“当前”“下一步”均指记录日期。各阶段配置和判据不同，不能合并成当前独立测量成功率；早期原始数据未统一保留。
 

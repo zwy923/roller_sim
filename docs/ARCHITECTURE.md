@@ -73,16 +73,19 @@
 | `trial.py` | 布料 → `sim/layouts.py`；交接记录 → `verify/transfer.py` |
 | `simulate.py` 的 `run()`（243 行） | `simulate.py`（循环）+ `sim/line.py` + `control/supervisor.py` + `sim/record.py` + `sim/results.py` |
 
-常量改名（旧任务文件里的 `"set"` 由 `experiments/s6/s6_run.py` 自动对应）：`singulator.station.WEIGH_MAX_S` → `sensing.weigher.WEIGH_MAX_S`，`singulator.station.STOP_BACK` → `machine.station.STOP_BACK`，`singulator.station.APPROACH` → `control.station.APPROACH`。`perception.SPLIT_PAD` / `GHOST_S` 设为 `None` 的旧行为已删除，只能在源码快照上跑。
+常量改名（旧名字不再识别）：`singulator.station.WEIGH_MAX_S` → `sensing.weigher.WEIGH_MAX_S`，`singulator.station.STOP_BACK` → `machine.station.STOP_BACK`，`singulator.station.APPROACH` → `control.station.APPROACH`。`perception.SPLIT_PAD` / `GHOST_S` 设为 `None` 的旧行为已删除，只能在重构前的代码上跑。
+
+**重构前的代码**在 git 标签 `before-refactor`（提交 `77c8907`），连同 S6 / S7 当时的源码快照、任务清单和过程记录；2026-10-06 起这些不在工作目录里，取用方法见 [README](../README.md#2026-10-05-结构重构)。
 
 ## 行为是否变了：怎么验证的
 
 - **方法**：重构前（提交 `77c8907`）和重构后的代码，在同一台机器、同一套库版本上各跑同一批工况，逐位比较 `result.json`（去掉时间戳、输出目录、源码哈希）、轨迹（每 10 ms 全部记录量的哈希）和模型 XML。重构前的代码自己重复跑两遍，54 例全部逐位相同，所以比较中出现任何差异都是代码造成的。
 - **结果：47 例全部逐位相同。** 覆盖：基线四种布料 14 例、`--sensing oracle` 1 例、相机控制给料 6 例、验收场景 6 例、故障注入 5 例、结构与控制选项 7 例（平板犁面、无侧带、车道规则、滚动摩擦、粗步长、`--set` 改常量等）、机头小试与滚筒机头 3 例、结构候选 5 例。这些工况里发生过犁面撤离（4 例，其中 2 例最终卡死停线）、给料点动、缓冲带停位、区段暂停、作废停住、件的拆分、全线冻结和各类故障停线。另有 29 组配置只比较模型 XML，全部相同。
+- **补充（2026-10-06，Python 3.12，与项目 `.venv` 同一小版本）**：快速自检全部通过；用产生 S7 结论数据的那份源码快照和重构后的代码各跑同样 8 批（含 S7 记录里没测成的 5 批），`s7_compare.py` 比对：7 批逐项相同，另 1 批两边都因初始布料重叠被拒绝运行。那份快照和重构前的项目代码只差往结果里写 `measurement_audit` 一项。
 - **比较时排除的字段**：`config` 里已删除的选项和新增的 `set`、`geometry.skew_deg`，以及两处提到旧模块名的说明文字（`provenance.limitations`、`geometry.devices.note`）。
 - **有意的行为变化只有一处**：`--sensing oracle` 下的停滞判断并到了默认路径的同一套规则（`SectionWatch` 读理想视图）。试了一例 oracle 模式下发生停滞的批次，撤离时刻和停线时刻与重构前相同；这只是一例，不保证所有情况相同。默认路径（`--sensing vision`）不受影响。
-- **没有验证的**：Windows 上的运行——验证在 Linux 上做，重构前同一种子在两个平台上的结果本来就有差异（种子 392 清线时刻 44.33 s 对 44.15 s），所以"等价"只在同一平台内成立；被删除的选项对应的旧结果，新代码无法复现，要用 `experiments/*/snapshots/`。视频渲染只跑通过一次（0.3 s，无中文字体）。
-- 自检：`python checks/run_all.py --full`。
+- **没有验证的**：Windows 上的运行——验证在 Linux 上做，重构前同一种子在两个平台上的结果本来就有差异（种子 392 清线时刻 44.33 s 对 44.15 s），所以"等价"只在同一平台内成立；被删除的选项对应的旧结果，新代码无法复现，要用重构前的代码（git 标签 `before-refactor`）。视频渲染只跑通过一次（0.3 s，无中文字体）。
+- 自检：`python checks/run_all.py --full`。在本机验收重构：用同样的种子重跑 S7（约 20 分钟），再用 `s7_compare.py` 和保存的结果逐批比对，命令见 [experiments/README.md](../experiments/README.md)；预期逐批相同。
 
 ## 还没解决的结构问题
 

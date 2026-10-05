@@ -48,8 +48,9 @@ python checks/timestep_checks.py                          # 同来料三档步�
 python designs/transfer_trial/sweep.py                    # 小试：机头几何 × 布料矩阵
 python plough.py --set control.station.APPROACH=.65       # 临时改一个模块常量（可重复；python -m singulator.tuning 列出全部）
 python experiments/s7/s7_jobs.py --seeds 7101-7160 --out runs/s7_jobs.json            # 基线批量：四种布料 × 种子
-python experiments/s6/s6_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10   # 多进程跑，中断后同一条命令续跑
+python experiments/s7/s7_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10   # 多进程跑，中断后同一条命令续跑
 python experiments/s7/s7_analyze.py runs/s7 --list                                    # 逐块审计：独立测量成功率、失败原因
+python experiments/s7/s7_compare.py experiments/s7/results/out_valid_b/baseline runs/s7/baseline   # 同一批任务跑两遍：逐批逐项是否相同
 python experiments/s7/s7_analyze_checks.py                                            # 逐块审计的自检（不跑物理）
 ```
 
@@ -58,7 +59,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - `trajectory.npz`：每 10 ms 一帧，各块位姿（pos + quat）、质心、前缘、接触类别位掩码、犁面角、犁面接触法向力、各驱动速度系数、称重读数、排料板角度；配合 `model.xml` 可精确重建每块料；
 - `model.xml`；`video.mp4`：上半跟随斜视，下半正交俯视。
 
-`runs/` 放新运行和临时试跑；以前的演示、烟雾验证和旧扫描移到 `runs/archive/`，详见 [运行产物索引](runs/README.md)。正式批次在 `experiments/s6/`、`experiments/s7/` 内按 `jobs/`（任务）、`results/`（结果）、`snapshots/`（源码）、`archive/`（过程记录）存放；压缩完整结果不包含轨迹与模型 XML。运行方式见 [EXPERIMENTS.md](docs/EXPERIMENTS.md)。
+`runs/` 放新运行和临时试跑，不进 git。正式批次的原始结果在 `experiments/s7/results/`（不进 git，只有本机这一份；压缩完整结果不包含轨迹与模型 XML）。运行方式见 [EXPERIMENTS.md](docs/EXPERIMENTS.md)。
 
 ## 当前结构
 
@@ -89,7 +90,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - **给料读质心**（`--feeder-sensing oracle`）：给料带控制器不经过相机，直接读每块料的真实质心和轮廓；没有"料团"，慢走和放出都按质心判。相机控制给料（料团按前缘预送等）留在 `--feeder-sensing vision`。计量段、犁面仍读模拟相机和光电；`--sensing oracle` 是整条线都读真值的对照。
 - **计量固定 1 s**（`--weigh-model fixed`）：计量带停稳后 1 s 出数，取最后 0.5 s 的平均；读数稳不稳只记录（`steady`），不作废。原来"3 s 内读数稳定才出数、否则作废"的规则留在 `--weigh-model steady`。
 - 同日修了读质心路径上 S1 失效的误报（见文末「2026-10-04、10-05 修复」）。
-- 第 S6 节的批次是 10-04 的线。用现在的代码复现要带 `--lane-w .65 --feeder-sensing vision --weigh-model steady`（`experiments/s6/s6_jobs.py` 已自动加）。
+- 第 S6 节的批次是 10-04 的线。用现在的代码复现要带 `--lane-w .65 --feeder-sensing vision --weigh-model steady`。
 
 **撤离**：犁面整体绕折弯端铰点铰接，撤离 −25°，相机判卡触发。复位要同时满足：区段走空；没有任何料的整块轮廓伸进犁面回位要扫过的区域（留 10 mm）。复位过程中每 10 ms 重查，有料进入就停在原位、退回保持。20 s（`--face-hold-max-s`）内得不到复位许可就停线（`jammed` / `retract_hold_timeout`），不带料强收；开始复位后 6 s 未到位记 `face_fault`。
 
@@ -146,7 +147,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - **接触参数尚未证明收敛**：默认 dt 0.25 ms、solref 2 ms；三档步长对照里部分工况清空时间仍敏感。
 - **料不可破碎，恢复系数未标定**；密度、摩擦、块形均是假设。
 - **给料机头默认是尖边**：实物是滚筒，两条带之间会有交接间距；滚筒、尾辊和交接间距已可建模（`--feeder-head-d` 等），哪种几何能用要先做台架小试。
-- **质心纵向齐平、并排翻下的两块**，缓冲带速差拉不开（它们同时落到快带上），只能作废停机、人工分开。基线下没测成的料全部出自给料机头一次放下了不止一块，其中质心真的齐平的是少数（第 S7 节）；拆不拆得开看两块过主带机头时错开多少（[S6 料块间距分析](experiments/s6/REPORT.md#三一对料拆不拆得开看过主带机头时错开多少)）。
+- **质心纵向齐平、并排翻下的两块**，缓冲带速差拉不开（它们同时落到快带上），只能作废停机、人工分开。基线下没测成的料全部出自给料机头一次放下了不止一块，其中质心真的齐平的是少数（第 S7 节）；拆不拆得开看两块过主带机头时错开多少（[S6 料块间距分析](docs/history/EXPERIMENTS_S6.md#三一对料拆不拆得开看过主带机头时错开多少)）。
 - **有意推后的问题**（机头一次放两块、读数稳定核验、相机控制给料、圆料在接缝处、节拍、模型本身的缺陷）集中记在 [TODO.md](docs/TODO.md)，每条写了现在怎么简化的、已经知道什么、什么时候该捡起来。
 - **停车不是无限制动**：给料带、缓冲带、计量带用有限制动力；报警后结束模拟，不模拟随后的滑行。
 - **相机、扫描、称重的模型偏乐观**（凸料、无遮挡、理想力传感），见 [designs/station/DESIGN.md](designs/station/DESIGN.md)「实物风险」。
@@ -193,20 +194,17 @@ designs/
   station/             缓冲带、计量带、排料板与流程逻辑
   transfer_trial/      给料机头小试的台架方案（DESIGN.md）与仿真矩阵（sweep.py）
   flip_separator/      排料板独立模型（model.py：渲染、交互窗口、检查输出）
-  step_lifter_concept/ SF-01 抬料器方案草图（draw_concept.py）
 experiments/
-  README.md            当前 S7 / 历史 S6 的入口与存放规则
-  s6/                  第 S6 节的批量试验：s6_jobs.py（清单）、s6_run.py（多进程、可续跑，S7 共用；新旧代码
-                       快照都能跑）、s6_analyze.py（汇总）、s6_pairs.py（一起放下的两块料后来怎样）
-  s7/                  第 S7 节，基线的批量验证：s7_jobs.py（清单）、s7_analyze.py（共用审计的批量报告）、s7_analyze_checks.py（审计自检）
-  每节下的 jobs/       已保存的任务清单；root 相对清单定位到 ../snapshots/
-           results/    原始摘要和压缩完整结果，保留 out* 组名
-           snapshots/  当时的源码副本，保留 candidate* 版本名（都是重构前的平铺结构）
-           archive/    历史差异、日志、草稿、临时试跑与备份
-           REPORT.md   该阶段的完整实验过程、结果表格与复现记录
-runs/                  新运行产物；旧演示和试跑在 archive/，见本目录 README.md
-archive/               文件整理记录、修改前备份和校验清单
+  README.md            批量实验的入口与常用命令
+  s7/                  第 S7 节，基线的批量验证：s7_jobs.py（清单）、s7_run.py（多进程跑批、可续跑）、
+                       s7_compare.py（同一批跑两遍是否逐项相同）、s7_analyze.py（共用审计的批量报告）、
+                       s7_feed.py（给料机头每次放料）、s7_analyze_checks.py（审计自检）
+    REPORT.md          完整实验过程、结果表格与复现记录
+    results/           原始摘要和压缩完整结果，保留 out* 组名（不进 git）
+runs/                  新运行产物（不进 git）
 ```
+
+第 S6 节（10-04 的结构与控制对比）只留下记录 [docs/history/EXPERIMENTS_S6.md](docs/history/EXPERIMENTS_S6.md)；它的原始结果 2026-10-06 已删除。重构前的源码、S6 / S7 的脚本、源码快照和任务清单在 git 标签 `before-refactor` 上，见下面「2026-10-05 结构重构」。
 
 设备之间在仿真里不碰撞，活动件间隙只能靠 `motion_clearance`（`checks/plough_checks.py` 第 9 节、`checks/station_checks.py`）。
 
@@ -216,9 +214,10 @@ archive/               文件整理记录、修改前备份和校验清单
 
 ## 2026-10-05 结构重构
 
-只动代码结构，不改机器和控制规则：同一环境下重构前后逐位比对（`result.json` 与轨迹），结果见 [ARCHITECTURE.md](docs/ARCHITECTURE.md) 末尾。用的时候要知道的三件事：
+只动代码结构，不改机器和控制规则：同一环境下重构前后逐位比对（`result.json` 与轨迹），结果见 [ARCHITECTURE.md](docs/ARCHITECTURE.md) 末尾。用的时候要知道的几件事：
 
-- **删掉的选项**（都是对照用的旧实现）：`--face-drive-model kinematic`、`--no-drive-limit`、`--face-shape straight` / `--skew-deg`、`--face-hinge upstream`、`--no-unjam`（改用 `--unjam-max 0`）、`--feed-band plough`、`--layout rows`、`--material-model legacy_binary`、`--blob-lead centroid`。带这些参数的旧命令会报"无此参数"；要复现当时的结果，用 `experiments/*/snapshots/` 里的源码快照。
+- **删掉的选项**（都是对照用的旧实现）：`--face-drive-model kinematic`、`--no-drive-limit`、`--face-shape straight` / `--skew-deg`、`--face-hinge upstream`、`--no-unjam`（改用 `--unjam-max 0`）、`--feed-band plough`、`--layout rows`、`--material-model legacy_binary`、`--blob-lead centroid`。带这些参数的旧命令会报"无此参数"；要复现当时的结果，用重构前的代码（下一条）。
+- **重构前的代码和资料在 git 标签 `before-refactor`**（提交 `77c8907`）：当时的源码，第 S6 节的全部脚本，S6 / S7 的四份源码快照（`experiments/*/snapshots/`）、已保存的任务清单（`jobs/`）、过程记录（`archive/`）和 10-05 的文件整理记录。原始结果不在 git 里：S7 的还在 `experiments/s7/results/`，S6 的已删除。2026-10-06 起这些不再放在工作目录里。要用：先提交手头的改动，`git checkout before-refactor`，按那一版自己的 README 运行（`.venv` 和 `results/` 不受切换影响），用完 `git checkout main` 回来。
 - **改模块常量**不再在任务文件里写 `singulator.station.X`，改用 `--set control.station.X=值`（任务文件的 `"set"` 同理）；`python -m singulator.tuning` 列出全部可改的常量及其所在模块。
 - **换称重 / 体积装置**：`sensing/weigher.py` 的 `Weigher`、`sensing/volume.py` 的 `Scanner` 是工位控制器用到的全部接口，换实现不用动控制器。
 

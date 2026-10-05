@@ -8,7 +8,6 @@ __pycache__/
 runs/*
 !runs/README.md
 experiments/*/results/
-experiments/*/archive/scratch/
 output/
 
 # 大文件

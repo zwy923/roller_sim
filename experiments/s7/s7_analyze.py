@@ -3,7 +3,7 @@
     python experiments/s7/s7_analyze.py OUT_DIR [OUT_DIR ...] [--only a,b] [--seeds FIRST-LAST] [--alias a=b ...]
                                         [--list] [--json FILE]
 
-Reads what experiments/s6/s6_run.py writes: <config>/<tag>.json (a summary; only 'error' when the batch did not run)
+Reads what experiments/s7/s7_run.py writes: <config>/<tag>.json (a summary; only 'error' when the batch did not run)
 and <config>/<tag>.result.json.gz (the full result). The audit is imported from singulator.audit, also used by
 simulate.run and the single-run CLI. It is keyed by the true lump put on the feed belt, never by a camera's object number, and the true state
 is used to judge the result only.

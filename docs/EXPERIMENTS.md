@@ -25,10 +25,10 @@
 | 记录 | 查什么 |
 |---|---|
 | [S7 完整记录](../experiments/s7/REPORT.md) | 小批定位、S1 误报修正、逐布料结果、9 次失败明细、核对与复现 |
-| [S6 完整记录](../experiments/s6/REPORT.md) | 相机给料与判稳配置下的控制、结构对比及样本外验证；候选组合未进入当前基线 |
+| [S6 历史记录](history/EXPERIMENTS_S6.md) | 相机给料与判稳配置下的控制、结构对比及样本外验证；候选组合未进入当前基线 |
 | [S1–S5 历史记录](history/EXPERIMENTS_S1-S5.md) | 计量段迭代、作废停住、机头小试、高差与缓冲带、出口宽度及圆料问题 |
 
-S6、S7 各自保存 `jobs/`、`results/`、`snapshots/`、`archive/`；历史数据与版本说明分别见 [S6 索引](../experiments/s6/README.md)、[S7 索引](../experiments/s7/README.md)。早期记录的命令和结论按当时版本理解。
+S7 的原始结果在 `experiments/s7/results/`（不进 git），数据与版本说明见 [S7 索引](../experiments/s7/README.md)。S6 只留下记录，原始结果 2026-10-06 已删除。当时的脚本、源码快照和任务清单在 git 标签 `before-refactor` 上。早期记录的命令和结论按当时版本理解。
 
 ## 常用入口
 

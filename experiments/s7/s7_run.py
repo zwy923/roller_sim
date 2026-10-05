@@ -1,15 +1,13 @@
-"""Batch runner for the S6 experiments (EXPERIMENTS.md S6, 2026-10-04), shared with S7: a list of jobs through the
-model, one process per batch, resumable.
+"""Batch runner: a list of jobs through the model, one process per batch, resumable.
 
-    python experiments/s6/s6_run.py --jobs JOBS.json --out OUT_DIR [--workers N] [--root PROJECT_ROOT] [--match TEXT]
+    python experiments/s7/s7_run.py --jobs JOBS.json --out OUT_DIR [--workers N] [--root PROJECT_ROOT] [--match TEXT]
 
 JOBS.json: [{"config": name, "tag": layout_seed, "argv": [plough.py arguments], "set": {"MODULE.NAME": value},
 "root": folder}, ...] (an experiment's *_jobs.py writes it).
   "set"   changes tunable constants for that job: the same as --set MODULE.NAME=VALUE in argv
           (singulator/tuning.py), e.g. {"control.station.APPROACH": 0.65};
-  "root"  relative to JOBS.json, is the project folder that job runs -- a snapshot of the code kept next to the
-          results -- in place of PROJECT_ROOT. A snapshot from before 2026-10-05 has the flat package: there "set"
-          names a module constant by its full path (singulator.station.APPROACH) and is applied to the module.
+  "root"  relative to JOBS.json, is the project folder that job runs -- another checkout of the code -- in place
+          of PROJECT_ROOT.
 Each job is one batch through singulator.simulate.run in its own process. Per job it keeps, under OUT_DIR/<config>/:
   <tag>.json            a compact summary (what the experiments' *_analyze.py read);
   <tag>.result.json.gz  the full result.json of the run (trajectory.npz and model.xml are not written).
@@ -115,21 +113,10 @@ def summary(job, r, wall):
                 wall_s=round(wall, 1), peak_mb=_peak_mb(), platform=sys.platform)
 
 
-# where the constants that S6 jobs set by their old module path live now
-MOVED = {'singulator.station.WEIGH_MAX_S': 'sensing.weigher.WEIGH_MAX_S',
-         'singulator.station.STOP_BACK': 'machine.station.STOP_BACK',
-         'singulator.station.APPROACH': 'control.station.APPROACH'}
-
-
 def _set_flags(settings):
-    """A job's "set" as --set flags for the layered package."""
+    """A job's "set" as --set flags."""
     out = []
     for name, value in (settings or {}).items():
-        if name.startswith('singulator.'):
-            if name not in MOVED:
-                raise ValueError('"set" %s: not a tunable of this code (it is from before 2026-10-05); give the job '
-                                 'the snapshot it was written for as "root"' % name)
-            name = MOVED[name]
         text = 'none' if value is None else ','.join(repr(v) for v in value) if isinstance(value, (list, tuple)) \
             else repr(value)
         out += ['--set', '%s=%s' % (name, text)]
@@ -149,26 +136,15 @@ def work(arg):
     sys.path.insert(0, root)
     t0 = time.time()
     try:
-        import inspect
         from singulator import simulate
         from singulator.config import parse_config
         full = {}
 
         def keep(cfg, result, xml, traj, drive_names):       # no files from the run itself
             full['r'] = result
-        if 'save' in inspect.signature(simulate.run).parameters:
-            cfg = parse_config(list(job['argv']) + _set_flags(job.get('set')))
-            cfg['out_dir'] = Path(out) / job['config'] / job['tag']
-            r = simulate.run(cfg, save=keep)
-        else:                                                # a snapshot from before 2026-10-05: the flat package
-            import importlib
-            for name, value in (job.get('set') or {}).items():
-                mod, attr = name.rsplit('.', 1)
-                setattr(importlib.import_module(mod), attr, value)
-            simulate._write = keep
-            cfg = parse_config(job['argv'])
-            cfg['out_dir'] = Path(out) / job['config'] / job['tag']
-            r = simulate.run(cfg)
+        cfg = parse_config(list(job['argv']) + _set_flags(job.get('set')))
+        cfg['out_dir'] = Path(out) / job['config'] / job['tag']
+        r = simulate.run(cfg, save=keep)
         s = summary(job, r, time.time() - t0)
         dest.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(dest.with_name(job['tag'] + '.result.json.gz'), 'wt', encoding='utf-8') as fh:
