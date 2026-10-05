@@ -42,6 +42,19 @@ class PhysicsChecks(unittest.TestCase):
                 fp = layouts.footprint(b[k]['vertices'], yaw)
                 self.assertGreaterEqual(y + fp[2], cfg['lane_y'] + .005 - 1e-12)
 
+    def test_touching_layout_lays_nothing_into_anything(self):
+        """Until 2026-10-06 the touching layout closed each lump onto the one ahead only: it could reach into the
+        lump abreast (62 seeds in 7001-9000, up to 11.5 cm: 7134) or past the low-side skirt (7 seeds, 8.5 cm:
+        7277), and the line refused those batches. Now they are laid clear; a layout that was clear is unchanged."""
+        from singulator.sim.line import Line
+        for seed, refit in ((7028, True), (7029, True), (7041, True), (7083, True), (7111, True), (7117, True),
+                            (7134, True), (7277, True), (7101, False), (7106, False)):
+            ln = Line(self.cfg('--layout', 'touching', '--seed', str(seed), '--count', str(3 + seed % 3)))
+            self.assertEqual(ln.initial_pen, 0., seed)
+            self.assertEqual('refit' in ln.layout, refit, seed)
+            V = [L.world(ln.data) for L in ln.lumps]
+            self.assertGreaterEqual(min(v[:, 1].min() for v in V), ln.cfg['lane_y'] + .005 - 1e-9, seed)
+
     def test_invalid_inputs_fail_before_build(self):
         for args in (('--dt', '0'), ('--dt', '0.0006'), ('--v-belt', 'nan'), ('--count', '0'),
                      ('--gangue-fraction', '1.1'), ('--size-long-max', '.4'), ('--unjam-max', '-1'),
@@ -147,6 +160,43 @@ class PhysicsChecks(unittest.TestCase):
         data.warning[int(mujoco.mjtWarning.mjWARN_BADQACC)].number = 1
         diag.observe(data, 0.)
         self.assertIsNotNone(diag.failure)
+
+    def test_landing_is_recorded_apart_not_screened(self):
+        """A lump landing on the floor (the bins), or on another lump that has left the line, is recorded under
+        'landed' and does not fail the screen (2026-10-06; in S6 41 of 46 batches over the limit were only that).
+        Anything else, a landed lump against equipment or a lump still on the line included, is screened."""
+        cfg = self.cfg()
+        m = mujoco.MjModel.from_xml_string(
+            '<mujoco><worldbody><geom name="floor" type="plane" size="1 1 .1"/>'
+            '<geom name="frame" type="box" size=".1 .1 .1" pos="3 0 .1"/>'
+            '<body pos="0 0 .09"><freejoint/><geom name="a" type="sphere" size=".1"/></body>'
+            '<body pos="0 1 .1"><freejoint/><geom name="b" type="sphere" size=".1"/></body>'
+            '<body pos="0 1.19 .1"><freejoint/><geom name="c" type="sphere" size=".1"/></body>'
+            '</worldbody></mujoco>')
+        data = mujoco.MjData(m)
+        mujoco.mj_forward(m, data)
+        g = lambda n: m.geom(n).id
+        diag = Diagnostics(m, cfg)
+        diag.set_landed({g('a'), g('b'), g('c')})
+        diag.observe(data, 0.)
+        r = diag.report(data)
+        self.assertAlmostEqual(r['landed']['max_penetration_m'], .01)    # a 1 cm into the floor ...
+        self.assertEqual(r['max_penetration_m'], 0.)                     # ... b and c 1 cm into each other: landed too
+        self.assertTrue(r['ok'])
+        diag = Diagnostics(m, cfg)
+        diag.set_landed({g('a'), g('b')})                                # c is still on the line
+        diag.observe(data, 0.)
+        r = diag.report(data)
+        self.assertAlmostEqual(r['max_penetration_m'], .01)
+        self.assertEqual(sorted(r['worst_contact']['geoms']), ['b', 'c'])
+        self.assertFalse(r['ok'])
+        data.qpos[m.jnt_qposadr[0]:m.jnt_qposadr[0] + 3] = (3., 0., .29)  # a landed lump 1 cm into equipment
+        mujoco.mj_forward(m, data)
+        diag = Diagnostics(m, cfg)
+        diag.set_landed({g('a'), g('b'), g('c')})
+        diag.observe(data, 0.)
+        self.assertEqual(sorted(diag.report(data)['worst_contact']['geoms']), ['a', 'frame'])
+        self.assertFalse(diag.report(data)['ok'])
 
     def test_contact_options_reach_compiled_contacts(self):
         cfg = self.cfg('--contact-condim', '6', '--torsional-friction', '.001', '--rolling-friction', '.0001')

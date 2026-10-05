@@ -93,7 +93,8 @@ def audit(r):
     manual = bool(any(fate[c] for c in ('multi', 'touching', 'near', 'misjudged', 'collateral', 'dropped')))
     whole = sum(bool(f.get('whole_line')) for f in L.values())
     batch = dict(cls=cls, clear_s=r['outcome'].get('line_clear_s'), numerics_bad=not num['ok'],
-                 # over the limit only where a lump lands on a bin floor: nothing of the line (S6)
+                 # over the limit only where a lump lands on a bin floor: nothing of the line (S6). Results written
+                 # since 2026-10-06 screen the machine only (physics/numerics.py): this flag is for older ones
                  numerics_floor_only=bool(not num['ok'] and num.get('failure') is None and not num.get('warnings')
                                           and 'floor' in ((num.get('worst_contact') or {}).get('geoms') or [])),
                  verification_failed=failed, model_verification=model, unfinished=unfinished, manual=manual,

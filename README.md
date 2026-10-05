@@ -135,7 +135,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - `outcome.classification`：`single_file` / `single_file_after_unjam` / `abreast_at_cut`（两块同时跨过主带机头）/ `dropped` / `incomplete`（时限到还有料在线上）/ `jammed`（`retract_hold_timeout`、`unjam_exhausted`）/ `face_fault` / `station_fault`（排料板不到位或路径超时、光电误挡 / 长时遮挡 / 失效、视觉丢失 5 s）。
 - 卡堵：单块料在区段（犁面起点前 0.3 m 到车道出口）内连续待满 `--jam-window`（4 s），相机看到的质心前进 < `--jam-speed` × 窗口，且窗口内没有料的尾缘离开车道，即判停滞，触发撤离。还在给料带上排队、或被计量段按住的料不算。
 - `drives.*` 同时给净载荷（带符号 50 ms 平均）和单向载荷（先整流再平均）；**50 ms 平均只是模型诊断量，不是设计载荷**。驱动没有电流、发热和保护跳闸模型。
-- `numerics`：穿透、MuJoCo 警告、求解迭代上限与异常；任一超限都使 `ok=false`。`ok=true` 不代表收敛或现实准确。
+- `numerics`：穿透、MuJoCo 警告、求解迭代上限与异常；任一超限都使 `ok=false`。穿透只筛设备上的接触：料离线后落到地面（代表料仓）或落在另一块已离线的料上，记在 `numerics.landed`，不算超限（2026-10-06 起）。`ok=true` 不代表收敛或现实准确。
 
 ## 已知问题
 

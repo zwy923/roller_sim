@@ -163,14 +163,18 @@ def arrange(cfg, d, model, data, lumps, rng):
         lay_flat(model, data, lumps[a], front - w[a][0] / 2, ya + w[a][1] / 2, zl, 0.)
         lay_flat(model, data, lumps[b], front - w[b][0] / 2, ya + w[a][1] + w[b][1] / 2 + .01, zl, 0.)
         _close(model, data, lumps[a], lumps[b], 1)
-        prev = a
+        prev, laid, refit = a, [lumps[a], lumps[b]], []
         for k in ks[2:]:
             V = lumps[prev].world(data)
             lay_flat(model, data, lumps[k], float(V[:, 0].min()) - w[k][0] / 2 - .01,
                    float(V[:, 1].mean()), zl, 0.)
+            moved = _inside(model, data, lumps[k], y_lo, y_hi)
             _close(model, data, lumps[k], lumps[prev], 0)
+            if _clear(model, data, lumps[k], laid) or moved:
+                refit.append(k)
+            laid.append(lumps[k])
             prev = k
-        info.update(abreast=[a, b], nose_to_tail=[a] + ks[2:])
+        info.update(abreast=[a, b], nose_to_tail=[a] + ks[2:], **(dict(refit=refit) if refit else {}))
     x_rear = min(float(L.world(data)[:, 0].min()) for L in lumps)
     if x_rear < fd['x0'] + REAR_MARGIN:
         raise RuntimeError('trial layout %s does not fit on the %.2f m feed belt' % (case, fd['length_m']))
@@ -188,6 +192,42 @@ def _rows(model, data, lumps, ks, front, y_lo, y_hi, zl, yaw, gap):
         lay_flat(model, data, lumps[k], x - dx / 2, y + dy / 2, zl, yaw(k))
         y += dy + gap
         depth = max(depth, dx)
+
+
+def _inside(model, data, A, y_lo, y_hi):
+    """Shift lump A across the belt until its plan lies within y_lo .. y_hi. A lump laid nose to tail behind a
+    narrower one, centred on it, could reach past the low-side skirt (touching 7277: 8.5 cm into it). True if it
+    moved; a lump already inside is not touched."""
+    V = A.world(data)
+    lo, hi = float(V[:, 1].min()), float(V[:, 1].max())
+    dy = y_lo - lo if lo < y_lo else y_hi - hi if hi > y_hi else 0.
+    if dy:
+        data.qpos[A.q + 1] += dy
+        mujoco.mj_forward(model, data)
+    return bool(dy)
+
+
+def _clear(model, data, A, laid):
+    """Lump A, just closed onto the lump ahead of it (_close), may reach into another one already laid: the one
+    abreast when that is the longer and A the wider (touching 7134: 11.5 cm into it; 62 seeds in 2000 laid lumps
+    more than 1 mm into each other, which the line refused to run). Back A off along the belt until it is clear of
+    every lump laid, then slide it forward until it is TOUCH from the first it meets. Each step forward is the gap
+    left less TOUCH, and no lump is nearer than that gap, so A never reaches into one. True if it moved; a lump
+    clear of all of them is not touched, so a layout that did not overlap is laid as before."""
+    ft = np.zeros(6)
+    gap = lambda: min(float(mujoco.mj_geomDistance(model, data, A.geom, B.geom, .5, ft)) for B in laid)
+    if gap() >= 0.:
+        return False
+    behind = min(float(B.world(data)[:, 0].min()) for B in laid)
+    data.qpos[A.q] -= float(A.world(data)[:, 0].max()) - behind + .01
+    mujoco.mj_forward(model, data)
+    for _ in range(60):
+        step = gap() - TOUCH
+        if step < .0005:
+            break
+        data.qpos[A.q] += step
+        mujoco.mj_forward(model, data)
+    return True
 
 
 def _close(model, data, A, B, axis):

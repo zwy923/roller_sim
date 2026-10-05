@@ -1,6 +1,7 @@
 """Batch runner: a list of jobs through the model, one process per batch, resumable.
 
     python experiments/s7/s7_run.py --jobs JOBS.json --out OUT_DIR [--workers N] [--root PROJECT_ROOT] [--match TEXT]
+                                    [--traj]
 
 JOBS.json: [{"config": name, "tag": layout_seed, "argv": [plough.py arguments], "set": {"MODULE.NAME": value},
 "root": folder}, ...] (an experiment's *_jobs.py writes it).
@@ -10,7 +11,9 @@ JOBS.json: [{"config": name, "tag": layout_seed, "argv": [plough.py arguments], 
           of PROJECT_ROOT.
 Each job is one batch through singulator.simulate.run in its own process. Per job it keeps, under OUT_DIR/<config>/:
   <tag>.json            a compact summary (what the experiments' *_analyze.py read);
-  <tag>.result.json.gz  the full result.json of the run (trajectory.npz and model.xml are not written).
+  <tag>.result.json.gz  the full result.json of the run;
+  <tag>/                with --traj only: result.json, model.xml and trajectory.npz as a single run writes them
+                        (about 0.5 MB a batch; experiments/s8/s8_beam.py replays them).
 Finished jobs are skipped, so the same command resumes an interrupted sweep. A file named STOP in OUT_DIR ends the
 sweep after the jobs already running. Workers opt out of Windows power throttling (see _full_speed) and use
 single-threaded BLAS; a worker takes about 150 MB.
@@ -90,6 +93,7 @@ def summary(job, r, wall):
                 jam_stop=o['jam_stop'], unjam=o['unjam_pulses'], touched_plough=o['touched_plough'],
                 together_at_cut_s=o['together_at_cut_s'], funnel=o['funnel'],
                 numerics_ok=r['numerics']['ok'], pen_mm=round(1000 * r['numerics']['max_penetration_m'], 2),
+                pen_landed_mm=round(1000 * ((r['numerics'].get('landed') or {}).get('max_penetration_m') or 0.), 2),
                 holds=st['counts']['holds'], void=st['counts']['void'], valid=st['counts']['valid'],
                 void_reasons=st['counts']['void_reasons'], n_items=st['counts']['items'], landed=st['counts']['landed'],
                 route_not_as_ideal=st['counts']['route_not_as_ideal'], void_discharged=st['counts']['void_discharged'],
@@ -124,7 +128,7 @@ def _set_flags(settings):
 
 
 def work(arg):
-    job, root, out = arg
+    job, root, out, traj = arg
     _full_speed()
     for v in ('OPENBLAS_NUM_THREADS', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS'):
         os.environ.setdefault(v, '1')     # the model's arrays are small: BLAS thread pools only cost memory
@@ -140,8 +144,11 @@ def work(arg):
         from singulator.config import parse_config
         full = {}
 
-        def keep(cfg, result, xml, traj, drive_names):       # no files from the run itself
+        def keep(cfg, result, xml, tr, drive_names):         # no files from the run itself, unless --traj
             full['r'] = result
+            if traj:
+                from singulator.sim import results
+                results.write(cfg, result, xml, tr, drive_names)
         cfg = parse_config(list(job['argv']) + _set_flags(job.get('set')))
         cfg['out_dir'] = Path(out) / job['config'] / job['tag']
         r = simulate.run(cfg, save=keep)
@@ -169,6 +176,7 @@ def main():
     p.add_argument('--root', default=str(here.parents[2]), help='project folder that holds the singulator package')
     p.add_argument('--workers', type=int, default=max(1, (os.cpu_count() or 2) - 4))
     p.add_argument('--match', default='', help='only jobs whose config/tag contains this text')
+    p.add_argument('--traj', action='store_true', help='also keep each run\'s model.xml and trajectory.npz')
     a = p.parse_args()
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -187,7 +195,7 @@ def main():
     with mp.Pool(a.workers, maxtasksperchild=1) as pool:
         at = Path(a.jobs).resolve().parent
         root = lambda j: (at / j['root']).resolve() if j.get('root') else Path(a.root).resolve()
-        args = [(j, str(root(j)), str(out)) for j in todo]
+        args = [(j, str(root(j)), str(out), a.traj) for j in todo]
         for config, tag, line, wall in pool.imap_unordered(work, args):
             n += 1
             say('[%d/%d] %s/%s %s (%s s)' % (n, len(todo), config, tag, line, wall))
