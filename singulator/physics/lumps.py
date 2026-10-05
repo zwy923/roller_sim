@@ -16,6 +16,7 @@ from ..machine import station
 from ..machine.assembly import LUMP_BODY, LUMP_GEOM, LUMP_JOINT
 
 IN_LINE = ('on_belt', 'passed')   # still on the line ('passed' = tail past the singulator's plane, the head edge)
+END_STATES = ('sorted', 'dropped', 'taken_off')   # the states that end a lump's run
 
 
 def world_vertices(data, geom, local):
@@ -67,7 +68,6 @@ class Lump:
         self.cut_n = self.face_yaw = None
         self.drop_t = self.drop_x = None
         self.s_hist, self.c_hist = [], []       # (t, front x), (t, centroid x)
-        self.eligible_since = None
         self.touched_plough = False
         self.stalled_s = 0.
         self.feeder_wait_s = 0.                 # queued on the stopped feed belt
@@ -128,10 +128,6 @@ class Lump:
             self.pass_t = t
         return cut, first
 
-    def centroid_progress(self, n_win):
-        h = self.c_hist
-        return h[-1][1] - h[-1 - n_win][1] if len(h) > n_win else math.inf
-
     def summary(self):
         p = self.last_pose
         return dict(state=self.state, front_at_plane_s=self.enter, tail_past_plane_s=self.pass_t,
@@ -149,24 +145,3 @@ class Lump:
                         x=round(p[0], 3), y=round(p[1], 3), z=round(p[2], 3),
                         x_range=[round(p[3], 3), round(p[4], 3)], y_range=[round(p[5], 3), round(p[6], 3)],
                         yaw_deg=round(p[7], 1), touching=p[8]))
-
-
-def stalled(lumps, in_section, waiting, t, cfg, n_win):
-    """Stall rule (2026-09-22): a lump that has sat in the singulation section for a whole jam_window
-    without its CENTROID advancing jam_speed * jam_window. Centroid, not front edge: a lump turning in
-    place moves its front, not its centre. Per lump, not the batch maximum: one moving lump used to mask
-    an arch among the others. Planned waiting (waiting: on the feed belt, held by the station) is not a
-    candidate."""
-    for L in lumps:
-        if L.k not in in_section or waiting(L):
-            L.eligible_since = None
-        elif L.eligible_since is None:
-            L.eligible_since = t
-    return [L.k for L in lumps if L.eligible_since is not None
-            and t - L.eligible_since >= cfg['jam_window'] - 1e-9
-            and L.centroid_progress(n_win) < cfg['jam_speed'] * cfg['jam_window']]
-
-
-def lane_discharging(lumps, t, window):
-    """A lump's tail left the lane within the window: the section is still emptying."""
-    return any(L.lane_tail_t is not None and L.lane_tail_t > t - window for L in lumps)

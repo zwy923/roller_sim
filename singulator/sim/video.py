@@ -61,11 +61,15 @@ class Recorder:
         self.top.close()
 
 
-def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, n_went, station):
+def overlay(line):
+    """The text lines over the video, from the running line (sim.line.Line): (text, big, rgb)."""
+    cfg, t, face, feeder = line.cfg, line.t, line.face, line.feeder
+    n_total, n_went = len(line.lumps), len(line.feed_witness.went)
     lines = [('主带 %.2f m/s  缓冲带 %.2f m/s  计量带 %.2f m/s  t=%5.1f s'
               % (cfg['v_belt'], cfg['buffer_speed'], cfg['station_speed'], t), True, (15, 20, 30)),
              ('尾缘过线%d/%d  同时过线%.2f s  主带驱动%.0f%%  犁面：%s'
-              % (n_tail, n_total, together_s, 100 * belt_f,
+              % (sum(1 for L in line.lumps if L.pass_t is not None), n_total, line.trace.together['s'],
+                 100 * line.belts.main.f,
                  FACE_PHASE_ZH[face.phase] + (' %.0f s' % (t - face.t0) if face.phase == 'hold' else '')),
               False, (30, 40, 55))]
     state = ('点动（把挂在边上的料送下去）' if feeder.jog is not None
@@ -76,7 +80,7 @@ def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, n_went, s
         '（缓冲带满，暂停）' if feeder.paused else '')
     lines.append(('给料带：%s  第 %d 次放料  已放 %d/%d 块' % (state, len(feeder.releases), n_went, n_total),
                   False, (30, 90, 70) if feeder.phase == 'feeding' else (90, 90, 100)))
-    return lines + station_lines(station)
+    return lines + station_lines(line.station)
 
 
 def station_lines(s):

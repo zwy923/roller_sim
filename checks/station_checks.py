@@ -43,7 +43,7 @@ from singulator.config import SAMPLE_S, parse_config  # noqa: E402
 from singulator.control import station  # noqa: E402
 from singulator.lumps import make_blocks, set_mass_properties  # noqa: E402
 from singulator.machine import assembly, sensors, separator, station as hw  # noqa: E402
-from singulator.physics.lumps import Lump  # noqa: E402
+from singulator.physics.lumps import END_STATES, Lump  # noqa: E402
 from singulator.sensing import beams, vision  # noqa: E402
 from singulator.sensing import weigher as scale  # noqa: E402
 from singulator.sim.scenarios import items_gone  # noqa: E402
@@ -98,7 +98,7 @@ class Geometry(unittest.TestCase):
         self.assertEqual((SC.width, SC.rib_count), (.70, 7))
         self.assertTrue(sp['coal_slides_when_closed'])               # tan 20 deg > 0.20 lining
         self.assertEqual((CFG['feeder_release'], CFG['sensing']), ('predict', 'vision'))   # the station defaults
-        self.assertIn('taken_off', D['end_states'])
+        self.assertIn('taken_off', END_STATES)
 
     def test_rejects(self):
         for args in (['--lane-w', '.72'], ['--buffer-len', '.80'], ['--measure-len', '.80'], ['--scan-s', '0'],

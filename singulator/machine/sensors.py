@@ -17,7 +17,8 @@ import math
 
 import numpy as np
 
-from .parts import LUMP_TOP, SKIRT
+from . import parts
+from .parts import SKIRT
 
 BEAM_HOUSING = (.02, .025, .04)      # half sizes (x, y, z) of an emitter / receiver housing
 BEAM_LENS_UP = .012                  # the lens sits this far above the housing's bottom face
@@ -62,7 +63,7 @@ def layout(cfg, d):
     """Beams, cameras and the volume scanner of the line, in world coordinates."""
     st, fd = d['station'], d['feeder']
     floor = st['separator']['floor_z']
-    T = SKIRT['thickness']
+    T, LUMP_TOP = SKIRT['thickness'], parts.LUMP_TOP
     # ---- beams: the line the controller tests, spanning between the housings' lenses ------------
     beams = [dict(name='beam_feed', role='feed belt: a lump tipped over the head edge stops the feed belt',
                   x=fd['beam']['x'], z=fd['beam']['z'], y0=cfg['lane_y'] - T, y1=cfg['belt_w'] + T, post=False,

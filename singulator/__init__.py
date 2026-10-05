@@ -12,7 +12,7 @@ The package in layers; a module imports only from the layers above its own:
   sensing/          what the controllers can know: cameras, beams, volume scanner, load cells as models
   control/          the controllers: feed belt, plough face, station
   verify/           verification against the true state (feeds nothing back)
-  sim/              running a batch: layouts, scenarios, the run, video
+  sim/              a batch put together and advanced: layouts, scenarios, the line, record, results, video
   simulate          run(cfg): the entry point (plough.py is its command line)
 
 docs/ARCHITECTURE.md describes the layers and how to replace a device model.

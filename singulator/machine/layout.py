@@ -12,7 +12,7 @@ sensors and the controllers. What it holds:
     belt_x0, belt_x1             the conveying surface: the feed belt's tail end, the main belt's head edge
     skirt_out_end                x where the outer skirt ends (the window the swinging face needs)
     sb_x0, sb_chain, n_sbslat, v_side    the side belt: start, chain length, slats, surface speed
-    drop_z, end_states           a lump below drop_z has left the machine; the states that end a lump's run
+    drop_z                       a lump whose lowest point is below it has left the machine
     view_x1                      downstream end of what the plan view shows
     report                       the JSON-safe description that goes to result.json ('geometry')
 
@@ -46,7 +46,7 @@ def derive(cfg):
              lane_top=lane_top, exit_x=exit_x, final_x=final_x,
              belt_x0=x0, belt_x1=x1, feeder=fd, station=st,
              # a lump whose lowest point falls below drop_z has left the machine (station.landing says where)
-             drop_z=st['drop_z'], end_states=('sorted', 'dropped', 'taken_off'), view_x1=st['end_x'] + .3,
+             drop_z=st['drop_z'], view_x1=st['end_x'] + .3,
              v_side=v_side, **sb,
              report=dict(face_shape='curve', face_kind=cfg['face_kind'],
                          curve_top_deg=cfg['curve_top_deg'], curve_exit_deg=cfg['curve_exit_deg'],

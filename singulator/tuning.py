@@ -1,7 +1,7 @@
 """Tunables: changing a module constant of the package for one run, on the record.
 
 The margins, thresholds and sensor-model numbers of the line are constants next to the code they belong to, each
-with the reason for its value (control/station.py: APPROACH, ISO_MARGIN ...; sensing/vision.py: LATENCY_S ...).
+with the reason for its value (control/station.py: APPROACH, ISO_MARGIN ...; sensing/vision.py: POS_SIGMA ...).
 They are not command-line parameters: there are about 150 of them and a run normally changes none. When an
 experiment does change one, it says so here instead of patching the module behind the model's back:
 
