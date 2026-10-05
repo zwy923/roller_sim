@@ -35,19 +35,27 @@ from scipy.spatial import ConvexHull
 from scipy.spatial.distance import pdist
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # the project folder
-from singulator import assembly, drives, face, feeder, lumps, machine, perception, simulate, tracking  # noqa: E402
+from singulator import geom2d, lumps, simulate  # noqa: E402
 from singulator.config import parse_config  # noqa: E402
+from singulator.series import load_stats  # noqa: E402
+from singulator.control import face, feeder  # noqa: E402
+from singulator.machine import assembly, derive, feed_belt, parts, plough  # noqa: E402
+from singulator.physics import actuators, drives  # noqa: E402
+from singulator.physics.lumps import world_vertices  # noqa: E402
+from singulator.sensing import beams  # noqa: E402
+from singulator.sim import layouts  # noqa: E402
 
 LINE = parse_config(['--no-video', '--seed', '2'])
 
 
 class IdealServo:
-    """A face servo that follows its reference exactly (the interface of face.FaceServo, no MuJoCo): the phase
-    machine in face.FaceRetract is checked on it. blocked(): it does not move this step (a jammed face)."""
+    """A face servo that follows its reference exactly (the interface of physics.actuators.FaceServo, no MuJoCo):
+    the phase machine in control.face.FaceRetract is checked on it. blocked(): it does not move this step (a jammed
+    face)."""
 
     def __init__(self, cfg, d, dt, blocked=lambda phase: False):
         self.dt, self.blocked = dt, blocked
-        self.parts, self.piv = machine.face_parts(cfg, d)
+        self.parts, self.piv = plough.face_parts(cfg, d)
         self.lever = float(np.linalg.norm(d['P1'] - d['P0']))
         self.delta, self.swing_s = math.radians(cfg['face_swing_deg']), cfg['face_swing_s']
         self.drive = drives.make_motor(cfg['face_force_max'], 50., 1., cfg['motor_slip'])
@@ -55,16 +63,16 @@ class IdealServo:
         self.reached = False
         self.loads, self.hold, self.by_phase = [], [], dict(out=[], back=[])
 
-    def command(self, phase, data):
+    def command(self, phase):
         goal = self.delta if phase == 'out' else 0. if phase == 'back' else self.theta
         rate = abs(self.delta) / self.swing_s * self.dt
         step = 0. if self.blocked(phase) else float(np.clip(goal - self.theta, -rate, rate))
         self.theta, self.actual_omega = self.theta + step, step / self.dt
 
-    def record(self, t, phase, data, ramp):
+    def record(self, t, phase, ramp):
         pass
 
-    sweep = face.FaceServo.sweep
+    sweep = actuators.FaceServo.sweep
 
     def report(self):
         return {}
@@ -79,7 +87,7 @@ def config(**over):
 def build(**over):
     """Config -> derived geometry -> compiled model, as run() does it."""
     cfg = config(**over)
-    d = machine.derive(cfg)
+    d = derive(cfg)
     blocks = lumps.make_blocks(cfg, np.random.default_rng(cfg['seed']))
     m = mujoco.MjModel.from_xml_string(assembly.build_xml(cfg, d, blocks))
     return cfg, d, blocks, m, mujoco.MjData(m)
@@ -126,7 +134,7 @@ def oracle_observe(f, t, V, states, home):
     b = f.g['beam']
     view = {k: dict(cx=float(v[:, 0].min() + v[:, 0].max()) / 2, x0=float(v[:, 0].min()), x1=float(v[:, 0].max()),
                     y1=float(v[:, 1].max())) for k, v in enumerate(V) if states[k] == 'on_belt'}
-    f.observe(t, view, any(states[k] == 'on_belt' and perception.cuts_line(v, b['x'], b['z'])
+    f.observe(t, view, any(states[k] == 'on_belt' and beams.cuts_line(v, b['x'], b['z'])
                            for k, v in enumerate(V)), home)
 
 
@@ -136,8 +144,8 @@ def main():
            ('a face at 90 deg at the belt edge', dict(curve_top_deg=90.)),
            ('a face with its exit not below its top', dict(curve_top_deg=30., curve_exit_deg=55.))]
     for label, over in bad:
-        check(raises(lambda o=over: machine.derive(config(**o))), 'rejects %s' % label)
-    check(not raises(lambda: machine.derive(config())), 'accepts the line')
+        check(raises(lambda o=over: derive(config(**o))), 'rejects %s' % label)
+    check(not raises(lambda: derive(config())), 'accepts the line')
     check(raises(lambda: simulate.run(config(solref=.0005, dt=.0005)), ValueError),
           'run() rejects solref 0.5 ms with dt 0.5 ms (needs solref >= 2*dt)')
 
@@ -164,7 +172,7 @@ def main():
     an = math.degrees(math.atan2(Rn[1, 0], Rn[0, 0]))
 
     def on_face(c, R, p):
-        return abs(abs(float(np.dot(p - c, R[:, 1]))) - machine.PLOUGH['thickness'] / 2) < tol
+        return abs(abs(float(np.dot(p - c, R[:, 1]))) - plough.PLOUGH['thickness'] / 2) < tol
 
     lengths = sum(2 * geom(m, data, 'plough%d' % i)[1][0] for i in range(segs))
     check(segs > 5 and abs(a0 + cfg['curve_top_deg']) < 1e-3 and abs(an + cfg['curve_exit_deg']) < 1e-3
@@ -173,7 +181,7 @@ def main():
           and np.allclose(d['face_pts'][0], d['P0']) and np.allclose(d['face_pts'][segs], d['P1'])
           and abs(d['P1'][1] - d['lane_top']) < 1e-12
           and abs(lengths - d['report']['diagonal_length_m']) < segs * tol
-          and abs(c0[2] - s0[2] - machine.PLOUGH['bottom_gap']) < tol and abs(2 * s0[2] - machine.PLOUGH['height']) < tol,
+          and abs(c0[2] - s0[2] - plough.PLOUGH['bottom_gap']) < tol and abs(2 * s0[2] - plough.PLOUGH['height']) < tol,
           '%d face boxes from P0 to the bend P1 on the lane wall line: first %.1f deg at the belt edge, last %.1f deg'
           ' at the lane, %.4f m long in all, bottom gap %.4f m, height %.2f m, material face through the polyline'
           % (segs, -a0, -an, lengths, c0[2] - s0[2], 2 * s0[2]))
@@ -231,8 +239,8 @@ def main():
           and f['slides_along_face'] and abs(f['lock_ceiling_deg'] - math.degrees(math.atan(1 / cfg['friction_steel']))) < 1e-9,
           'locking at the top: mu*tan(beta) = %.2f < 1, ceiling %.1f deg for mu %.2f (margin %.0f %%)'
           % (f['ratio_mu_tan_beta'], f['lock_ceiling_deg'], f['mu_face'], 100 * f['margin']))
-    steep = machine.derive(config(curve_top_deg=70.))['report']['face_locking']
-    lined = machine.derive(config(curve_top_deg=65., friction_steel=.20))['report']['face_locking']
+    steep = derive(config(curve_top_deg=70.))['report']['face_locking']
+    lined = derive(config(curve_top_deg=65., friction_steel=.20))['report']['face_locking']
     check(not steep['slides_along_face'] and lined['slides_along_face'],
           'the bound bites: a 70 deg top on steel reports LOCKS, 65 deg on a UHMW-PE face (0.20) still slides')
 
@@ -241,7 +249,7 @@ def main():
     for fam in lumps.FAMILIES:
         b = dict(lumps.make_block(rng, fam, .40), material='gangue', density=2500.)
         one = lumps.make_blocks(config(count=1), np.random.default_rng(0))
-        cfg1, d1 = config(count=1), machine.derive(config(count=1))
+        cfg1, d1 = config(count=1), derive(config(count=1))
         one[0].update(b)
         mm = mujoco.MjModel.from_xml_string(assembly.build_xml(cfg1, d1, one))
         mass = mm.body_mass[mujoco.mj_name2id(mm, mujoco.mjtObj.mjOBJ_BODY, 'b0')]
@@ -317,7 +325,7 @@ def main():
            if (mujoco.mj_id2name(mv, B, b) or '').startswith('fr')
            and (mujoco.mj_id2name(mv, B, b) or 'x')[2:].isdigit()]
     pts = np.array(dv['face_pts'])[:, :2]
-    Rr = machine.FACE_ROLLER['d'] / 2
+    Rr = plough.FACE_ROLLER['d'] / 2
     dev, ctr = [], []
     for n in frn:
         c = datav.xpos[mujoco.mj_name2id(mv, B, n)][:2]
@@ -348,7 +356,7 @@ def main():
                                                dv['lane_out_start']))
     check(mv.jnt_type[ji] == mujoco.mjtJoint.mjJNT_HINGE and abs(mv.jnt_axis[ji][2] - 1) < 1e-12
           and not any(mv.actuator_trnid[a][0] == ji for a in range(mv.nu))
-          and abs(2 * mv.geom_size[gi][1] - machine.FACE_ROLLER['height']) < 1e-9,
+          and abs(2 * mv.geom_size[gi][1] - plough.FACE_ROLLER['height']) < 1e-9,
           'each roller is a free hinge about z (no actuator), D %.0f mm x %.2f m tall'
           % (1000 * 2 * mv.geom_size[gi][0], 2 * mv.geom_size[gi][1]))
     # scatter layout: one de-stacked layer, arbitrary distribution, laid on the feed belt. The whole point is that
@@ -359,21 +367,21 @@ def main():
     for sd in range(25):
         rs = np.random.default_rng(sd)
         bl = lumps.make_blocks(cfgv, rs)
-        layer, rear, front = lumps.plan_scatter(cfgv, bl, rs, dv)
-        hulls = [lumps.hull2d(bl[k]['vertices'], yaw) + (x, y) for k, x, y, z, yaw in layer]
+        layer, rear, front = layouts.plan_scatter(cfgv, bl, rs, dv)
+        hulls = [layouts.hull2d(bl[k]['vertices'], yaw) + (x, y) for k, x, y, z, yaw in layer]
         for i in range(len(hulls)):
             for j in range(i + 1, len(hulls)):
-                if lumps.overlap2d(hulls[i], hulls[j], margin=0.):
+                if geom2d.overlap(hulls[i], hulls[j], margin=0.):
                     worst_gap = -1.
         # every lump must REST on the feed belt: its lowest vertex, not its centroid (which rises with size)
-        lows = [z + lumps.footprint(bl[k]['vertices'], yaw)[4] for k, x, y, z, yaw in layer]
+        lows = [z + layouts.footprint(bl[k]['vertices'], yaw)[4] for k, x, y, z, yaw in layer]
         if max(lows) - min(lows) > 1e-9 or abs(min(lows) - fdl['step_m'] - cfgv['feed_drop_height']) > 1e-9:
             worst_gap = -2.
-        fits &= abs(front - (fdl['x1'] - feeder.FRONT_MARGIN)) < 1e-9 and rear >= fdl['x0'] + feeder.REAR_MARGIN - 1e-9
+        fits &= abs(front - (fdl['x1'] - layouts.FRONT_MARGIN)) < 1e-9 and rear >= fdl['x0'] + layouts.REAR_MARGIN - 1e-9
         depths.append(front - rear)
     check(worst_gap > 0 and fits,
           'scatter layout over 25 batches: no two plan-view hulls overlap (single layer), every lump starts on the '
-          'feed belt surface, the front %.2f m behind the head edge, the rear on the belt' % feeder.FRONT_MARGIN)
+          'feed belt surface, the front %.2f m behind the head edge, the rear on the belt' % layouts.FRONT_MARGIN)
     print('    scatter patch depth over 25 batches of 5: %.2f..%.2f m (feed belt %.2f m)'
           % (min(depths), max(depths), fdl['length_m']))
 
@@ -384,7 +392,7 @@ def main():
     for sd in (1, 81, 260, 530):
         rng9 = np.random.default_rng(sd)
         bl9 = lumps.make_blocks(cfgv, rng9)
-        layer, _, _ = lumps.plan_scatter(cfgv, bl9, rng9, dv)
+        layer, _, _ = layouts.plan_scatter(cfgv, bl9, rng9, dv)
         m9 = mujoco.MjModel.from_xml_string(assembly.build_xml(cfgv, dv, bl9))
         dat9 = mujoco.MjData(m9)
         for k, x, y, z, yaw in layer:
@@ -395,7 +403,7 @@ def main():
         for k, blk9 in enumerate(bl9):
             g9, b9 = m9.geom('bg%d' % k).id, m9.body('b%d' % k).id
             local = m9.mesh_vert[m9.mesh_vertadr[m9.geom_dataid[g9]]:][:m9.mesh_vertnum[m9.geom_dataid[g9]]]
-            V = lumps.block_world_vertices(dat9, dict(geom=g9, local=local))
+            V = world_vertices(dat9, g9, local)
             ref = dat9.xpos[b9] + blk9['vertices'] @ dat9.xmat[b9].reshape(3, 3).T
             old = dat9.xpos[b9] + local @ dat9.xmat[b9].reshape(3, 3).T
             box = lambda P: np.array([P.min(0), P.max(0)])
@@ -411,7 +419,7 @@ def main():
     # (--face-kind plate) would hit the single-file camera's mast (-32 mm, 2026-09-30)
     for label, over in (('the line', {}),):
         cc = config(**over)
-        dd = machine.derive(cc)
+        dd = derive(cc)
         res = assembly.motion_clearance(cc, dd)
         worst = min(r['min_distance_m'] for r in res.values())
         check(worst > 1e-3 and not any(r['unresolved'] for r in res.values()),
@@ -427,14 +435,14 @@ def main():
     series = np.zeros(4000)
     series[1000:1400] = -2500.                 # 0.2 s of resistance, the rest idle
     series[2000:2002] = -40000.                # a 1 ms contact spike
-    stl = drives.load_stats(series, dtl, 3000.)
+    stl = load_stats(series, dtl, 3000.)
     check(stl['resist_avg50ms_max_N'] == stl['net_avg50ms_resist_max_N'] == 2500. and stl['resist_peak_step_N'] == 40000.
           and abs(stl['resist_over_10pct_limit_s'] - .201) < 1e-9 and stl['assist_avg50ms_max_N'] == 0.
           and np.percentile(series, 99) == 0.,
           'one-sided resistance: 50 ms average %.0f N, spike %.0f N, loaded %.3f s -- the old signed p99 reads %.0f N'
           % (stl['resist_avg50ms_max_N'], stl['resist_peak_step_N'], stl['resist_over_10pct_limit_s'],
              np.percentile(series, 99)))
-    alt = drives.load_stats(np.tile([2000., -2000.], 2000), dtl, 3000.)
+    alt = load_stats(np.tile([2000., -2000.], 2000), dtl, 3000.)
     check(alt['net_avg50ms_resist_max_N'] == alt['net_avg50ms_assist_max_N'] == 0.
           and alt['resist_avg50ms_max_N'] == alt['assist_avg50ms_max_N'] == 1000.
           and alt['resist_over_10pct_limit_s'] == alt['assist_over_10pct_limit_s'] == 1.,
@@ -447,8 +455,8 @@ def main():
     cf, df = cfgv, dv
     dtf = cf['dt']
     sq = lambda x0, x1, y0, y1: np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], float)
-    check(face.polygons_overlap(sq(0, 1, 0, 1)[None], sq(1.005, 2, 0, 1), .01)[0]
-          and not face.polygons_overlap(sq(0, 1, 0, 1)[None], sq(1.02, 2, 0, 1), .01)[0],
+    check(geom2d.overlap_many(sq(0, 1, 0, 1)[None], sq(1.005, 2, 0, 1), .01)[0]
+          and not geom2d.overlap_many(sq(0, 1, 0, 1)[None], sq(1.02, 2, 0, 1), .01)[0],
           'polygon test: 5 mm apart overlaps within the 10 mm clearance, 20 mm apart does not')
     # the reviewer's case: rear at x 0.30, front already at x 0.75 near the belt edge, inside the plough area
     intruder = {0: sq(.30, .75, .95, 1.18)}
@@ -459,8 +467,8 @@ def main():
         fr_.start(0.)
         tt, n, log = 0., 0, []
         while tt < t1 and fr_.phase not in ('idle', 'fault'):
-            fr_.command(tt, None)
-            fr_.record(tt, None)
+            fr_.command(tt)
+            fr_.record(tt)
             if n % 20 == 0:
                 fr_.zone_busy = busy(tt)
                 fr_.check_sweep(plans(tt))
@@ -496,22 +504,22 @@ def main():
 
     print('--- 12. feed belt: step-down transfer released lump by lump ---')
     cq = config(feeder_release='lane', sensing='oracle')
-    dq = machine.derive(cq)
+    dq = derive(cq)
     fq = dq['feeder']
-    check(raises(lambda: machine.derive(config(feeder_speed=.40)))
-          and raises(lambda: machine.derive(config(feeder_creep_speed=.20)))
-          and raises(lambda: machine.derive(config(feeder_step=0.)))
-          and raises(lambda: machine.derive(config(feeder_gap=.70))),
+    check(raises(lambda: derive(config(feeder_speed=.40)))
+          and raises(lambda: derive(config(feeder_creep_speed=.20)))
+          and raises(lambda: derive(config(feeder_step=0.)))
+          and raises(lambda: derive(config(feeder_gap=.70))),
           'rejects a feed belt as fast as the main belt, a creep faster than the approach, no step, and a gap shorter '
           'than one lump + the stopping distance')
     check(abs(fq['x1'] - (cq['plough_x'] - cq['feeder_gap'])) < 1e-12
           and abs(fq['x1'] - fq['x0'] - cq['feeder_len']) < 1e-12 and dq['belt_x0'] == fq['x0']
           and fq['longest_plan_extent_m'] + fq['stop_distance_m'] <= cq['feeder_gap']
-          and abs(fq['beam']['x'] - fq['x1'] - feeder.BEAM_X) < 1e-12 and abs(fq['beam']['z'] - fq['step_m'] / 2) < 1e-12,
+          and abs(fq['beam']['x'] - fq['x1'] - feed_belt.BEAM_X) < 1e-12 and abs(fq['beam']['z'] - fq['step_m'] / 2) < 1e-12,
           'feed belt x %.3f..%.3f (%.2f m), %.2f m of main belt to the plough start >= %.3f m plan extent + %.3f m'
           ' stopping distance; drop beam %.2f m past the edge at z %.3f m; skirts start at the feed belt'
           % (fq['x0'], fq['x1'], fq['length_m'], cq['feeder_gap'], fq['longest_plan_extent_m'], fq['stop_distance_m'],
-             feeder.BEAM_X, fq['beam']['z']))
+             feed_belt.BEAM_X, fq['beam']['z']))
     mq = mujoco.MjModel.from_xml_string(assembly.build_xml(cq, dq, []))
     datq = mujoco.MjData(mq)
     mujoco.mj_forward(mq, datq)
@@ -520,7 +528,7 @@ def main():
     check(abs((cfd[2] + sfd[2]) - (cmf[2] + smf[2]) - fq['step_m']) < 1e-9 and abs(cfd[0] + sfd[0] - fq['x1']) < 1e-4
           and abs(cmf[0] - smf[0] - fq['x1']) < 1e-4 and abs(cmf[0] + smf[0] - dq['belt_x1']) < 1e-4
           and abs(sfd[1] - smf[1]) < 1e-9
-          and tracking.CATS[tracking.categorise(mq)[mq.body_geomadr[mq.body('feeder').id]]] == 'belt',
+          and assembly.CATS[assembly.categorise(mq)[mq.body_geomadr[mq.body(feed_belt.BODY).id]]] == 'belt',
           'feed belt top %.3f m above the main belt top, head edge at x %.3f where the main belt starts, same width;'
           ' the main belt runs on straight to its head edge x %.3f; the feed belt counts as belt contact'
           % (fq['step_m'], fq['x1'], dq['belt_x1']))
@@ -528,9 +536,9 @@ def main():
     # the drop beam on synthetic hulls: boxes as 8 vertices, X = the head edge, h = the step
     X, h = fq['x1'], fq['step_m']
     bx = lambda x0, x1, z0, z1: np.array([[x, y, z] for x in (x0, x1) for y in (.2, .6) for z in (z0, z1)])
-    beam = lambda V: perception.cuts_line(V, fq['beam']['x'], fq['beam']['z'])
+    beam = lambda V: beams.cuts_line(V, fq['beam']['x'], fq['beam']['z'])
     # tipped nose-down about the edge (X, h) until its underside at the beam is a quarter step above the main belt
-    th, rel = math.atan(.75 * h / feeder.BEAM_X), bx(X - .2, X + .2, h, h + .3) - (X, 0., h)
+    th, rel = math.atan(.75 * h / feed_belt.BEAM_X), bx(X - .2, X + .2, h, h + .3) - (X, 0., h)
     tilt = np.stack([rel[:, 0] * np.cos(th) + rel[:, 2] * np.sin(th), rel[:, 1],
                      -rel[:, 0] * np.sin(th) + rel[:, 2] * np.cos(th)], 1) + (X, 0., h)
     check(not beam(bx(X - .25, X + .20, h, h + .30)) and beam(bx(X - .05, X + .40, 0., .30))
@@ -632,7 +640,7 @@ def main():
              'at %.2f s' % lead['lane_tail_s'] if lead.get('lane_tail_s') else 'not by 12 s'))
 
     print('\nwall heights: skirt/side belt %.2f m, plough %.2f m against lump screen size %.2f-%.2f m'
-          % (machine.SKIRT['height'], machine.PLOUGH['height'], cfg['size_min'], cfg['size_max']))
+          % (parts.SKIRT['height'], plough.PLOUGH['height'], cfg['size_min'], cfg['size_max']))
     print('all checks passed')
 
 

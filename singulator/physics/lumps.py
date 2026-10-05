@@ -1,53 +1,40 @@
-"""What is observed about each lump during a run, and the stall rule built on it.
+"""The lumps in the running model: each one's true state, sampled every 10 ms.
 
-Every 10 ms each lump's true outline is placed in the world (geom frame of the compiled mesh), and its
+Every sample each lump's true outline is placed in the world (geom frame of the compiled mesh), and its
 front edge, centroid, contacts, lane and measuring-plane crossings are recorded. Front arrival and tail
 passage are kept apart: a batch is through when every TAIL has passed the measuring plane.
+
+This is the truth: the sensors are formed from it (sensing/), the record and the verification are written from it.
+No controller reads it.
 """
 import math
 
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from . import station
-from .lumps import block_world_vertices, exit_cut
+from ..machine import station
+from ..machine.assembly import LUMP_BODY, LUMP_GEOM, LUMP_JOINT
 
-# contact categories, by the equipment a lump touches (bit i of trajectory.npz 'touch' = CATS[i]): 'belt' is the
-# feed and main belts, 'buffer' the buffer belt with its skirts, 'weigher' the measuring belt with its (the weigh
-# frame), 'device' the sensor hardware (singulator/devices.py)
-CATS = ('other', 'belt', 'plough', 'block', 'skirt', 'lane_wall', 'side_belt', 'buffer', 'weigher',
-        'separator', 'device')
+IN_LINE = ('on_belt', 'passed')   # still on the line ('passed' = tail past the singulator's plane, the head edge)
 
 
-def categorise(model):
-    """Category index of every geom (see CATS)."""
-    import mujoco
-    G, B = mujoco.mjtObj.mjOBJ_GEOM, mujoco.mjtObj.mjOBJ_BODY
-    cat = np.zeros(model.ngeom, dtype=np.int8)
-    for g in range(model.ngeom):
-        gname = mujoco.mj_id2name(model, G, g) or ''
-        bname = mujoco.mj_id2name(model, B, model.geom_bodyid[g]) or ''
-        if bname in ('mfloor', 'feeder', 'fdrum', 'mtail'):
-            cat[g] = 1
-        elif gname.startswith('plough') or (bname.startswith('fr') and bname[2:].isdigit()):
-            cat[g] = 2
-        elif gname.startswith('bg'):
-            cat[g] = 3
-        elif gname.startswith('skirt'):
-            cat[g] = 4
-        elif gname == 'lane_out':
-            cat[g] = 5
-        elif bname.startswith('vslat'):
-            cat[g] = 6
-        elif bname == 'bbelt' or gname.startswith('bskirt'):
-            cat[g] = 7
-        elif bname == 'mbelt' or gname.startswith('mskirt'):
-            cat[g] = 8
-        elif bname.startswith('sep_'):
-            cat[g] = 9
-        elif gname.startswith('dev_'):
-            cat[g] = 10
-    return cat
+def world_vertices(data, geom, local):
+    """World vertices of a lump. `local` are the COMPILED mesh vertices, which MuJoCo re-centres on the
+    centroid and turns onto the principal axes, compensating in the geom's own pos/quat -- so they must
+    be placed with the geom frame. Placing them with the body frame (as before 2026-09-22) was off by up
+    to 0.18 m on seed 81 and corrupted every observation built on it."""
+    return data.geom_xpos[geom] + local @ data.geom_xmat[geom].reshape(3, 3).T
+
+
+def exit_cut(V, edges, x):
+    """y-interval of a convex block's cross-section with the vertical plane at x, or None if it does not reach it."""
+    P, Q = V[edges[:, 0]], V[edges[:, 1]]
+    dp, dq = P[:, 0] - x, Q[:, 0] - x
+    m = (dp * dq <= 0) & (dp != dq)
+    if not m.any():
+        return None
+    y = P[m, 1] + dp[m] / (dp[m] - dq[m]) * (Q[m, 1] - P[m, 1])
+    return float(y.min()), float(y.max())
 
 
 def yaw_deg(R):
@@ -64,12 +51,12 @@ class Lump:
         import mujoco
         nid = lambda obj, s: mujoco.mj_name2id(model, obj, s)
         J, B, G = mujoco.mjtObj.mjOBJ_JOINT, mujoco.mjtObj.mjOBJ_BODY, mujoco.mjtObj.mjOBJ_GEOM
-        g = nid(G, 'bg%d' % k)
+        g = nid(G, LUMP_GEOM % k)
         mesh = model.geom_dataid[g]
         adr, n = model.mesh_vertadr[mesh], model.mesh_vertnum[mesh]
-        self.k, self.geom, self.body = k, g, nid(B, 'b%d' % k)
-        self.q, self.v = model.jnt_qposadr[nid(J, 'bj%d' % k)], model.jnt_dofadr[nid(J, 'bj%d' % k)]
-        self.local = model.mesh_vert[adr:adr + n].copy()      # geom-frame vertices: see block_world_vertices
+        self.k, self.geom, self.body = k, g, nid(B, LUMP_BODY % k)
+        self.q, self.v = model.jnt_qposadr[nid(J, LUMP_JOINT % k)], model.jnt_dofadr[nid(J, LUMP_JOINT % k)]
+        self.local = model.mesh_vert[adr:adr + n].copy()      # geom-frame vertices: see world_vertices
         tri = ConvexHull(self.local).simplices
         self.edges = np.array(sorted({tuple(sorted((int(fc[i]), int(fc[(i + 1) % 3])))) for fc in tri for i in range(3)}))
         self.state = 'on_belt'                  # on_belt / passed (tail past the head edge) / sorted / dropped /
@@ -92,12 +79,16 @@ class Lump:
         data.qpos[self.q:self.q + 3] = (x, y, z)
         data.qpos[self.q + 3:self.q + 7] = (math.cos(yaw / 2), 0., 0., math.sin(yaw / 2))
 
+    def world(self, data):
+        """Its outline now: world vertices (n, 3), from the poses of the last mj_forward."""
+        return world_vertices(data, self.geom, self.local)
+
     def observe(self, data, t, touch, cfg, d, waiting, dt_sample, slow):
         """One 10 ms sample. A sample whose centroid advances less than `slow` counts as stalled, or as
         planned waiting when waiting(lump) says so ('feeder': queued on the feed belt; 'station': held).
         Returns (cut at the measuring plane or None, True if the front reached it just now)."""
         R = data.xmat[self.body].reshape(3, 3)            # body frame: long axis = body x, for yaw
-        V = block_world_vertices(data, dict(geom=self.geom, local=self.local))
+        V = self.world(data)
         self.V = V                                         # world outline; the feeder's drop beam tests it
         com = data.xipos[self.body]
         self.s_hist.append((t, float(V[:, 0].max())))

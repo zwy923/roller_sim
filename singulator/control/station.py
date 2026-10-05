@@ -1,4 +1,5 @@
-"""Measuring and sorting station behind the lane: the second half of the line (third version 2026-09-30).
+"""Control of the measuring and sorting station behind the lane: buffer belt B, measuring belt M, the separator
+plate (third version 2026-09-30). The hardware is machine/station.py; what weighs and scans is sensing/.
 
     lane -> main belt head edge -> buffer belt (one step down) -> measuring belt (weigh + volume) -> flip separator
 
@@ -6,26 +7,15 @@ History. First version (2026-09-24 morning): weigh belt -> volume belt, the whol
 for every lump. Second version (afternoon): the former weigh belt became a buffer, weighing and the volume
 scan share one belt, sensors as hardware, the plate moves as soon as the density is known. Third version
 (2026-09-30, user): 优先让无效测量真正停止分选 -- a void measurement no longer only gets a flag and is sorted
-anyway; and the controllers read what real sensors deliver (singulator/perception.py), not the true state.
+anyway; and the controllers read what real sensors deliver (singulator/sensing/), not the true state.
 Same day (user): the station became the line itself (the gated mainline was deleted), the step onto B went to
 10 cm, the separator plate got side walls, and B got its own speed (buffer_speed) so that it can run faster
 than the main belt and pull apart lumps that come over the head edge together.
 
-Hardware as modelled:
-  * buffer belt B: station_w wide, buffer_len long, its top station_step BELOW the main belt, from the main
-    belt's head edge, running at buffer_speed; a lump tips onto it once its centroid passes that edge. Entry
-    beam S2 across B S2_X past the edge; staging beam S3 far enough before B's far end for B to stop a lead
-    that cuts it (STOP_BACK at least), STOP_Z above it;
-  * measuring belt M: same width and height as B, measure_len long, a flat joint with B. Load cells carry M
-    and its skirts (the reading is every contact force on them, averaged over the physics steps of each
-    10 ms sample); the volume scanner (three depth heads) over it;
-  * the flip separator (singulator/separator.py), as wide as M, with side walls (separator_wall high) riding
-    on the plate, behind it; beam S4 across the drop gap under the plate inlet; camera C3 over the plate.
-
-What the controllers read (--sensing vision): the camera objects of perception.Vision (estimated outline,
-extents, outline centroid, velocity, confidence, estimated lump count, track lineage), the beams S1-S4 as
-debounced signals, the load-cell reading, the scanner's verdict, the belt drives' own speed and the plate
-angle. The true state is used only to write the verification (keys starting with '_' / 'truth').
+What it reads (--sensing vision): the camera objects of sensing.vision.Vision (estimated outline, extents,
+outline centroid, velocity, confidence, estimated lump count, track lineage), the beams S1-S4 as debounced
+signals, the load-cell reading, the scanner's verdict, the belt drives' own speed and the plate angle. The true
+state is used only to write the verification (keys starting with '_' / 'truth').
 
 Items. An object whose outline centroid passes the head edge joins an item: the item of an object it
 descends from (track lineage), else the last item on B if it is closer than GROUP_GAP behind it, else a
@@ -86,51 +76,35 @@ window and every tolerance are placeholders.
 """
 import math
 
-import mujoco
 import numpy as np
 
-from . import separator
-from .lumps import FRICTION
-from .perception import CONF_OK, LATENCY_S, POS_SIGMA
+from ..config import SAMPLE_S
+from ..geom2d import box_gap
+from ..machine import sensors, station as hw
+from ..sensing import vision
 
-DEFAULTS = dict(station_w=.70, buffer_len=1.5, measure_len=.90, station_step=.10, station_speed=.40,
-                buffer_speed=.80, scan_s=1.,
-                sort_density=1800., separator_swing_s=2., separator_friction=FRICTION['lined_steel'],
-                separator_wall=.25)       # m: side walls on the plate (0 = none)
-RAMP_S = .30          # s: start / stop ramp of B, M and of the held section upstream
 FILTER_S = .30        # s: the indicator's moving average of the load-cell samples ...
 STEADY_S = .50        # s: ... is steady when over this long it stays within ...
 STEADY_BAND = .01     # ... this fraction of its value (at least STEADY_MIN_N); 60 lumps on the second version all
 STEADY_MIN_N = 2.     # N: settled within 0.8 s this way, 5 never did under the old 2 % std rule (rocking contacts)
 WEIGH_MAX_S = 3.      # s: at rest this long without a steady reading: void (unsteady)
-CLEAR = .02           # m: a lump is wholly on a belt once its rear is this far past the belt's start
-FRONT_MARGIN = .05    # m: a lump at rest on M keeps its front this far short of M's head edge
-STOP_BACK = .15       # m: the staging beam is at least this far before B's far end (more when B runs fast:
-                      # its stop distance plus the camera latency plus STAGE_ROOM) ...
-STOP_Z = .05          # ... this high above B (a flat lump is at least 6 cm thick)
 STAGE_CAM = .03       # m: the cameras see the lead's front this far past S3 while S3 is clear: stop B anyway
-STAGE_ROOM = .05      # m: a staged lead stops at least this far short of B's far end
 ACCEPT_AFTER = .30    # m: M takes the next item while discharging once the item on it has its rear this far on M
 APPROACH = .45        # m: --buffer-approach slow: B runs at M's speed while its lead's front is this close to the joint
                       # (S3 is 0.22 m before the joint at 0.8 m/s, and B needs 0.09 m to come down to 0.4 m/s)
 GROUP_GAP = .10       # m: a lump going over the head edge this close behind the last one joins its item
 HOLD_ZONE = .10       # m: a lump whose centroid is this close to the head edge is about to go over it
 ENTRY_ROOM = .55      # m: B takes a lump only with this much free belt behind its last lump
-GANGUE_X = .25        # m: the gangue beam is this far past M's head edge ...
-GANGUE_DZ = .45       # ... and this far below the plate inlet (under the plate's closing sweep)
 PLATE_MARGIN_S = .30  # s: the plate is in position this long before the lump's front reaches M's head edge
 HANG_S = .50          # s: a lump across the head edge without progress this long gets a creep jog of the section
 JOG = .075            # jog speed / belt speed: 0.03 m/s at 0.40, the feed belt's creep
-GAP = .02             # m: M's head edge -> plate inlet
-DROP = .02            # m: M's top -> rib tops at the plate inlet
 PLATE_TOL_DEG = .5    # plate in position within this
 PLATE_FAULT = 3.      # plate not in position after this many swing times: fault, stop
 STALL_S = 20.         # s: a lump in hand and no station state change this long: stop the run
-FORCE_MAX = 2000.     # N: B and M drive limits, assumed (as the take-off belt's)
-OBS_DT = .01          # s: observation sample
 G = 9.81
 # ---- void rules (placeholders, see the module docstring) ----
-V_MARGIN = 3 * POS_SIGMA   # m: position margin on camera-judged edges (0 with the oracle view)
+V_MARGIN = .015       # m: position margin on camera-judged edges: 3 x the cameras' outline position noise
+                      # (sensing.vision.POS_SIGMA); 0 with the ideal view
 ISO_MARGIN = .02      # m: while weighing the item's outline keeps this far inside the weigh zone (x) ...
 ISO_GAP = .05         # m: ... and no other object comes this close to it
 DENSITY_OK = (1000., 3200.)   # kg/m3: a density outside this is not a lump weighed whole
@@ -141,13 +115,6 @@ ZERO_CLEAR = .10      # m
 ZERO_OFF_S = 1.       # s: the empty reading outside the band this long: the scale is not clear (tare fault)
 HANDOVER_LEN = .70    # m: one S2 interruption over this much belt travel = more than one lump in a row (a
                       # single lump spans at most ~0.63 m in plan at the 0.50 m long-axis cap)
-S2_X = .65            # m: S2 lies this far past the head edge, where a lump lies flat on B again ...
-S2_Z = .015           # ... this high above B: low enough that two touching lumps mostly leave a gap under their
-                      # junction. 0.10 m (half the 5 cm step) until 2026-09-30: a lump's rear crossed it still in the
-                      # air (seed 392). 0.35 m then; with the 10 cm step a lump touches the beam, bounces clear of it
-                      # for 0.22-0.34 s and comes down again there -- two interruptions for one lump (6 of 160 in the
-                      # buffer sweep, 2026-10-01) -- so 0.65 m
-S2_ROOM = .30         # m: S2 lies at least this far before S3
 HANDOVER_MIN = .05    # m: an S2 interruption over less belt travel than this is a touch or a bounce, not a lump
                       # (the smallest lump blocks the low beam over about 0.1 m; seed 4001: a 2.8 cm blip)
 HANDOVER_JOIN = .08   # m: S2 clear for less than this much buffer belt travel between two blocks = one
@@ -159,6 +126,7 @@ FREEZE_MAX_S = 5.     # s: the vision not healthy this long (not found again): s
 DEAD_AFTER = 2       # hand-overs (S2) or releases (S1) in a row without the beam: the beam is dead
 ACROSS_IN = .10      # m: the cameras see a lump's body across a beam when the line is this far inside its outline
 
+
 STAGE_ZH = dict(buffer='缓冲', transfer='上计量带', onm='在计量带上', measure='称重+测体积', decided='等排料板',
                 discharge='排出', hold='作废停住')
 PLATE_ZH = dict(closed='落板（煤）', opening='抬起中', open='抬起（矸）', closing='回落中')
@@ -166,136 +134,22 @@ REASON_ZH = dict(multi='多块', handover='交接未确认', outside='搭秤外'
                  implausible='密度不合理', tare='秤未清空', track_lost='跟踪丢失')
 
 
-def geometry(cfg, x1, y_c):
-    """B from the main belt head edge x1, M after it, the separator after that, all centred on the lane
-    centre line y_c."""
-    for k in DEFAULTS:
-        if not math.isfinite(cfg[k]) or cfg[k] < 0 or (cfg[k] == 0 and k != 'separator_wall'):
-            raise ValueError('--%s must be finite and positive' % k.replace('_', '-'))
-    if cfg['station_w'] <= cfg['lane_w']:
-        raise ValueError('--station-w %.3f m must exceed the lane width %.3f m: the lane hands over into the buffer'
-                         % (cfg['station_w'], cfg['lane_w']))
-    span = math.hypot(cfg['size_long_max'], cfg['size_max'])       # plan diagonal of a flat-lying lump, bound
-    stop = cfg['station_speed'] * (RAMP_S / 2 + OBS_DT)
-    stop_back = max(STOP_BACK, cfg['buffer_speed'] * (RAMP_S / 2 + OBS_DT + LATENCY_S) + STAGE_ROOM)
-    need = dict(buffer_len=max(CLEAR + span, S2_X + S2_ROOM) + stop_back, measure_len=CLEAR + stop + span + FRONT_MARGIN)
-    for k, v in need.items():
-        if cfg[k] < v:
-            raise ValueError('--%s %.3f m cannot hold one lump (%.3f m plan extent) wholly: needs %.3f m'
-                             % (k.replace('_', '-'), cfg[k], span, v))
-    top = -cfg['station_step']
-    b0, b1 = x1, x1 + cfg['buffer_len']
-    m0, m1 = b1, b1 + cfg['measure_len']
-    sep = separator.for_width(cfg['station_w'], side_wall_height=cfg['separator_wall'])
-    origin = np.array([m1 + GAP, y_c, top - DROP - sep.rib_height - sep.inlet_height])
-    world = lambda P: [round(float(a + b), 4) for a, b in zip(origin, P)]
-    pivot = world(separator.layout(sep)[0])
-    closed, opened = separator.state(sep, sep.closed_deg), separator.state(sep, sep.open_deg)
-    mu = cfg['separator_friction']
-    inlet = world(closed['inlet'])
-    gz = inlet[2] - GANGUE_DZ
-    out_c, in_o = world(closed['outlet']), world(opened['inlet'])
-    # the plate's path: where a lump sent over the plate may still be while the plate must not move
-    zone = ((m1, y_c - cfg['station_w'] / 2 - .10, min(gz, out_c[2]) - .05),
-            (out_c[0] + .10, y_c + cfg['station_w'] / 2 + .10, inlet[2] + .50))
-    return dict(sep=sep, width_m=cfg['station_w'], y_c=y_c, top_z=top, step_m=cfg['station_step'],
-                speed_m_s=cfg['station_speed'], buffer_speed_m_s=cfg['buffer_speed'], ramp_s=RAMP_S,
-                buffer=dict(x0=b0, x1=b1, length_m=cfg['buffer_len'], speed_m_s=cfg['buffer_speed']),
-                measure=dict(x0=m0, x1=m1, length_m=cfg['measure_len'], scan_s=cfg['scan_s'],
-                             weigh_model=cfg.get('weigh_model', 'steady'),
-                             filter_s=FILTER_S, steady_s=STEADY_S, steady_band=STEADY_BAND,
-                             max_wait_s=WEIGH_MAX_S, skirts_on_weigh_frame=True,
-                             volume='true hull volume (ideal value); usability judged by the scanner model'),
-                beam_in=dict(x=b0 + S2_X, z=top + S2_Z), beam_stop=dict(x=b1 - stop_back, z=top + STOP_Z),
-                beam_gangue=dict(x=m1 + GANGUE_X, z=gz),
-                plate_zone=[[round(float(v), 4) for v in p] for p in zone],
-                longest_plan_extent_m=round(span, 4), stop_distance_m=round(stop, 4),
-                separator=dict(width_m=sep.width, rib_count=sep.rib_count, inlet_height_m=sep.inlet_height,
-                               origin=[round(float(v), 4) for v in origin], floor_z=round(float(origin[2]), 4),
-                               inlet=inlet, pivot=pivot, outlet_closed=out_c,
-                               inlet_open=in_o, outlet_open=world(opened['outlet']),
-                               closed_deg=sep.closed_deg, open_deg=sep.open_deg, swing_s=cfg['separator_swing_s'],
-                               deck_friction=mu,
-                               coal_slides_when_closed=bool(math.tan(math.radians(sep.closed_deg)) > mu)),
-                sort_density_kg_m3=cfg['sort_density'],
-                void_rules=dict(density_ok_kg_m3=list(DENSITY_OK), iso_margin_m=ISO_MARGIN, iso_gap_m=ISO_GAP,
-                                tare_tol_N=TARE_TOL, handover_len_m=HANDOVER_LEN, weigh_max_s=WEIGH_MAX_S,
-                                path_timeout_s=PATH_TIMEOUT_S,
-                                on_void='hold: no discharge, no plate move, no release; the simulation then takes '
-                                        'the lumps off the line (manual re-measuring is not modelled)'),
-                # a lump whose lowest point is below this has left the machine (the closed plate's outlet - 0.2 m)
-                drop_z=round(float(origin[2] + closed['outlet'][2] - .2), 4),
-                end_x=out_c[0])
-
-
-def report(st):
-    """The JSON-safe part of geometry()."""
-    return {k: v for k, v in st.items() if k != 'sep'}
-
-
-def landing(st, com):
-    """Where a lump that fell below drop_z went, by its centroid: through the gap in front of the pivot
-    ('sorted', 'gangue'), over the plate's far end ('sorted', 'coal'), else off a side or upstream
-    ('dropped', None)."""
-    if abs(com[1] - st['y_c']) > st['width_m'] / 2 + .10 or com[0] < st['measure']['x1'] - .05:
-        return 'dropped', None
-    return 'sorted', ('gangue' if com[0] < st['separator']['pivot'][0] else 'coal')
-
-
-def weigher_reading(model, data, weigher, lump_of, load_only=False):
-    """Load-cell reading of M: the downward contact force of everything touching M and its skirts, N.
-    Also, for the verification only, which lumps load M and what else every lump touches (other lumps by
-    id, 'equipment' off the weigh frame). load_only: the force alone (every physics step while weighing)."""
-    Fz, on, other, w = 0., set(), {}, np.zeros(6)
-    for i in range(data.ncon):
-        con = data.contact[i]
-        g1, g2 = int(con.geom1), int(con.geom2)
-        k1, k2 = lump_of.get(g1), lump_of.get(g2)
-        if g1 in weigher or g2 in weigher:
-            k = k2 if g1 in weigher else k1
-            if k is None:
-                continue
-            mujoco.mj_contactForce(model, data, i, w)
-            f = con.frame.reshape(3, 3).T @ w[:3]            # force of geom1 on geom2, world frame
-            Fz += f[2] if g1 in weigher else -f[2]
-            on.add(k)
-            continue
-        if load_only:
-            continue
-        for k, ok in ((k1, k2), (k2, k1)):
-            if k is not None:
-                other.setdefault(k, set()).add(ok if ok is not None else 'equipment')
-    return Fz if load_only else (Fz, on, other)
-
-
-def _box(o):
-    return o['x0'], o['x1'], o['y0'], o['y1']
-
-
-def gap2(a, b):
-    """Plan gap between two objects' bounding boxes (0 when they overlap)."""
-    dx = max(0., max(a['x0'], b['x0']) - min(a['x1'], b['x1']))
-    dy = max(0., max(a['y0'], b['y0']) - min(a['y1'], b['y1']))
-    return math.hypot(dx, dy)
-
-
 class Station:
-    """B, M and the plate. The drives are Conveyors motors and the plate cylinder a MuJoCo position servo;
-    this sets their targets from what the sensors report."""
+    """B, M and the plate. This sets the targets of their drives from what the sensors report: step() returns
+    the belt speed factors and moves plate_ref, the plate angle asked for (physics.drives.Conveyors and
+    physics.actuators.PlateDrive follow them in a run)."""
 
     def __init__(self, cfg, d, blocks):
         self.cfg, self.d, self.g, self.blocks, self.n = cfg, d, d['station'], blocks, len(blocks)
-        self.vision = cfg.get('sensing', 'vision') == 'vision'
+        self.vision = cfg['sensing'] == 'vision'
         self.vm = V_MARGIN if self.vision else 0.
         # the measuring device as a concept (--weigh-model fixed): mass and volume scan_s after M came to rest
-        self.fixed = cfg.get('weigh_model', 'steady') == 'fixed'
+        self.fixed = cfg['weigh_model'] == 'fixed'
         c = self.sep = self.g['sep']
-        deg = np.linspace(c.closed_deg, c.open_deg, 221)
-        self.ext = (deg, np.array([separator.state(c, a)['piston_extension_m'] for a in deg]))
         self.rate = (c.open_deg - c.closed_deg) / cfg['separator_swing_s']      # plate, deg/s
         self.v, self.vb = cfg['station_speed'], cfg['buffer_speed']     # M, B
-        self.centre = cfg.get('weigh_stop', 'rear') == 'centre'
-        self.slow = cfg.get('buffer_approach', 'full') == 'slow'
+        self.centre = cfg['weigh_stop'] == 'centre'
+        self.slow = cfg['buffer_approach'] == 'slow'
         # drive factors (1 = rated speed) and their goals; u is the whole section upstream of B
         self.u, self.b, self.m = 1., 0., 0.
         self.u_goal, self.b_goal, self.m_goal = 1., 1., 1.
@@ -315,22 +169,6 @@ class Station:
         self.s2, self.b_odo, self.s2_missed = [], 0., 0   # S2 interruptions; buffer belt odometer; misses in a row
         self.objs = {}
         self.taken = set()                          # verification: true lumps seen past the head edge
-
-    # ---- model hookup ---------------------------------------------------------------------------
-    def bind(self, model):
-        P = separator.PREFIX
-        self.q_plate = model.jnt_qposadr[model.joint(P + 'plate_hinge').id]
-        self.act = model.actuator(P + 'cylinder_position').id
-        mb = model.body('mbelt').id
-        self.weigher = {g for g in range(model.ngeom) if model.geom_bodyid[g] == mb
-                        or (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g) or '').startswith('mskirt')}
-
-    def place(self, model, data):
-        """Plate down (coal) at t = 0."""
-        separator.place(model, data, self.sep, self.sep.closed_deg)
-
-    def angle(self, data):
-        return math.degrees(float(data.qpos[self.q_plate]))
 
     def _stage(self, *stages):
         return [it for it in self.line if it['stage'] in stages]
@@ -361,13 +199,13 @@ class Station:
                                        and cx <= self.g['buffer']['x0'])
 
     # ---- per physics step ------------------------------------------------------------------------
-    def step(self, data, dt):
-        """Ramp the drive factors toward their goals, move the plate reference; returns (u, b, m)."""
-        r = dt / RAMP_S
+    def step(self, dt):
+        """One physics step: ramp the drive factors toward their goals and move the plate reference. Returns
+        (u, b, m): the speed factors of the section upstream, of B and of M."""
+        r = dt / hw.RAMP_S
         ramp = lambda x, goal: min(goal, x + r) if goal > x else max(goal, x - r)
         self.u, self.b, self.m = ramp(self.u, self.u_goal), ramp(self.b, self.b_goal), ramp(self.m, self.m_goal)
         self.plate_ref += float(np.clip(self.plate_goal - self.plate_ref, -self.rate * dt, self.rate * dt))
-        data.ctrl[self.act] = float(np.interp(self.plate_ref, *self.ext))
         return self.u, self.b, self.m
 
     # ---- every camera sample ---------------------------------------------------------------------
@@ -381,9 +219,9 @@ class Station:
         # the load cell: the mean of every physics step since the last sample while weighing, else this instant
         self.cell = self.load_sum / self.load_n if self.load_n else self.audit.get('reading', (0.,))[0]
         self.load_sum, self.load_n = 0., 0
-        self.held_s += OBS_DT * self.section_held
-        self.buffer_stopped_s += OBS_DT * (self.b_goal == 0.)
-        self.frozen_s += OBS_DT * self.frozen
+        self.held_s += SAMPLE_S * self.section_held
+        self.buffer_stopped_s += SAMPLE_S * (self.b_goal == 0.)
+        self.frozen_s += SAMPLE_S * self.frozen
         x_e, x_j, m_end = g['buffer']['x0'], g['buffer']['x1'], g['measure']['x1']
         self.objs = objs = {tid: o for tid, o in view.items() if o['cx'] > x_e and o['x0'] < g['plate_zone'][1][0]}
         for o in objs.values():
@@ -417,13 +255,13 @@ class Station:
                 x0 = m_end + 1.                                   # gone over the head edge and out of view
             if it['stage'] == 'buffer' and x1 > x_j:
                 it.update(stage='transfer', t_transfer_s=round(t, 3))
-            if it['stage'] == 'transfer' and x0 > x_j + CLEAR + self.vm:
+            if it['stage'] == 'transfer' and x0 > x_j + hw.CLEAR + self.vm:
                 it['stage'] = 'onm'
             first = not any(on_m(e) for e in self.line[:i])
-            at_front = x1 >= m_end - FRONT_MARGIN - self.v * (RAMP_S / 2 + OBS_DT)
+            at_front = x1 >= m_end - hw.FRONT_MARGIN - self.v * (hw.RAMP_S / 2 + SAMPLE_S)
             # --weigh-stop centre: an item wholly on M, M free for it, rides on to the middle of the weigh zone
             riding = self.centre and it['stage'] == 'onm' and first
-            centred = (x0 + x1) / 2 >= (x_j + m_end) / 2 - self.v * (RAMP_S / 2 + OBS_DT)
+            centred = (x0 + x1) / 2 >= (x_j + m_end) / 2 - self.v * (hw.RAMP_S / 2 + SAMPLE_S)
             if it['stage'] in ('transfer', 'onm') and self.m_goal == 1. and at_front and not riding:
                 # M is carrying it and its front is at the stop position before the item is wholly on (it is longer
                 # than the belt, or its lumps have drawn apart; seed 4014): stop now -- nothing leaves M unmeasured --
@@ -434,7 +272,7 @@ class Station:
             if it['stage'] == 'onm' and first and (not self.centre or centred or at_front):
                 it.update(stage='measure', t_stop_s=round(t, 3), tare_N=round(self.tare, 2))
                 self.samples = []
-            if it['stage'] == 'discharge' and x0 > m_end + CLEAR:
+            if it['stage'] == 'discharge' and x0 > m_end + hw.CLEAR:
                 it.update(stage='sent', t_off_s=round(t, 3))
         for it in [e for e in self.line if e['stage'] == 'sent']:
             self.line.remove(it)
@@ -461,7 +299,7 @@ class Station:
             if self.frozen:
                 break
             want = 'open' if it['route'] == 'gangue' else 'closed'
-            t_front = max(0., m_end - it['box'][1]) / self.v + RAMP_S / 2
+            t_front = max(0., m_end - it['box'][1]) / self.v + hw.RAMP_S / 2
             moving = self.plate == ('opening' if want == 'open' else 'closing')
             remaining = abs(self.plate_goal - self.plate_deg) / self.rate
             if self.plate == want or (moving and remaining + PLATE_MARGIN_S <= t_front):
@@ -599,7 +437,7 @@ class Station:
         """S2 interruptions on the buffer belt odometer, with the belt travel while blocked; a clear over less
         than HANDOVER_JOIN of travel or HANDOVER_JOIN_S between two blocks is one interruption (a lump lifting
         off the low beam after the drop, a rocking lump, or B stopped)."""
-        step = self.b * self.vb * OBS_DT
+        step = self.b * self.vb * SAMPLE_S
         self.b_odo += step
         log = self.s2
         if s2.blocked:
@@ -618,7 +456,7 @@ class Station:
         rides B from the beam on, so it passed the beam where the odometer read b_odo minus its distance past
         the beam (the camera's position is LATENCY_S old: B moved on meanwhile)."""
         bx = self.g['beam_in']['x']
-        lag = self.b * self.vb * LATENCY_S
+        lag = self.b * self.vb * sensors.LATENCY_S
         pad = self.vm + lag + .02
         for it in self.line:
             h = it['handover']
@@ -692,7 +530,7 @@ class Station:
             self.tare += (self.cell - self.tare) / ZERO_N
             self.zero_off = 0.
         else:
-            self.zero_off += OBS_DT
+            self.zero_off += SAMPLE_S
             if self.zero_off >= ZERO_OFF_S - 1e-9:
                 self.tare, self.zero_off = self.cell, 0.       # re-zero there: the item will be void (tare)
 
@@ -706,7 +544,7 @@ class Station:
             self._void(it, 'outside', detail='outline %.3f..%.3f m, weigh zone %.3f..%.3f m'
                        % (box[0], box[1], x_j + ISO_MARGIN, m_end - ISO_MARGIN))
         mine = set(it['now'])
-        if it['objs'] and any(min(gap2(o, m) for m in it['objs']) < ISO_GAP
+        if it['objs'] and any(min(box_gap(o, m) for m in it['objs']) < ISO_GAP
                               for tid, o in self.objs.items() if tid not in mine):
             self._void(it, 'outside', detail='another object within %.2f m' % ISO_GAP)
         if it['n_obj_max'] > 1 or it['n_est_max'] > 1:
@@ -714,7 +552,7 @@ class Station:
 
     def _measure(self, t, it, scanner):
         """Weigh (steady indicator) and scan (scan_s) at rest, together; the void checks all along."""
-        rest = it['t_stop_s'] + RAMP_S                    # M at rest from here
+        rest = it['t_stop_s'] + hw.RAMP_S                    # M at rest from here
         if t < rest - 1e-9:
             return
         self._isolation(it)
@@ -734,7 +572,7 @@ class Station:
             it['truth_isolated'] = it.get('truth_isolated', True) and iso
         if 'mass_kg' not in it:
             self.samples.append(self.cell - it['tare_N'])
-            nf, ns = int(round(FILTER_S / OBS_DT)), int(round(STEADY_S / OBS_DT))
+            nf, ns = int(round(FILTER_S / SAMPLE_S)), int(round(STEADY_S / SAMPLE_S))
             F = np.array(self.samples)
             steady = False
             if len(F) >= nf + ns - 1:
@@ -820,7 +658,7 @@ class Station:
             # a lump's body across the line (not a raised nose or tail: ACROSS_IN inside its outline both ways),
             # on the belt under the beam, seen with confidence
             across = [o for o in near if o['x0'] + ACROSS_IN < b.x < o['x1'] - ACROSS_IN and o['cx'] > x_on[name]
-                      and o['conf'] >= CONF_OK]
+                      and o['conf'] >= vision.CONF_OK]
             seen_clear = view.health['ok'] and not near
             expected = name == 'beam_stop' or belt[name] < .5    # staged, or the belt under it stopped
             # 'dead' by the cameras only for S3: at S1 and S2 a lump still overhanging the edge above the beam
@@ -861,7 +699,7 @@ class Station:
         on_b = [o for it in self.line if it['stage'] in ('buffer', 'transfer') for o in it['objs']]
         if self.jog is not None:
             j = self.jog
-            if j not in view or view[j]['x0'] > x_e + CLEAR or self.b_goal == 0.:
+            if j not in view or view[j]['x0'] > x_e + hw.CLEAR or self.b_goal == 0.:
                 self.jog = None
                 self._event(t, 'jog_done', tid=j)
             else:
@@ -926,6 +764,20 @@ class Station:
                               items=[(it['item'], it['stage']) for it in self.line],
                               not_cleared=[it['item'] for it in self.sent if 't_clear_s' not in it])
 
+    def geometry(self):
+        """The station for result.json: the hardware (machine.station.report) with what the measuring device and
+        this controller add to it -- how M weighs and scans, and the void rules."""
+        g = hw.report(self.g)
+        measure = dict(g['measure'], weigh_model=self.cfg['weigh_model'], filter_s=FILTER_S, steady_s=STEADY_S,
+                       steady_band=STEADY_BAND, max_wait_s=WEIGH_MAX_S, skirts_on_weigh_frame=True,
+                       volume='true hull volume (ideal value); usability judged by the scanner model')
+        return dict(g, measure=measure,
+                    void_rules=dict(density_ok_kg_m3=list(DENSITY_OK), iso_margin_m=ISO_MARGIN, iso_gap_m=ISO_GAP,
+                                    tare_tol_N=TARE_TOL, handover_len_m=HANDOVER_LEN, weigh_max_s=WEIGH_MAX_S,
+                                    path_timeout_s=PATH_TIMEOUT_S,
+                                    on_void='hold: no discharge, no plate move, no release; the simulation then takes '
+                                            'the lumps off the line (manual re-measuring is not modelled)'))
+
     def _event(self, t, event, **info):
         self.events.append(dict(t_s=round(t, 3), event=event, **info))
 
@@ -972,7 +824,7 @@ class Station:
         for it in done:
             for r in it['reasons']:
                 reasons[r] = reasons.get(r, 0) + 1
-        return dict(geometry=report(self.g), items=[clean(it) for it in self.items], events=self.events,
+        return dict(geometry=self.geometry(), items=[clean(it) for it in self.items], events=self.events,
                     counts=dict(self.counts, items=len(self.items), measured=len(done), valid=len(valid),
                                 void=len(done) - len(valid), void_reasons=reasons,
                                 gangue=sum(it.get('route') == 'gangue' for it in valid),

@@ -1,50 +1,36 @@
-"""What the line's controllers get from the sensors (--sensing vision, the default;
-2026-09-30, user: 把控制依据换成现实能获得的信号).
+"""The overhead cameras as the controllers see them: tracked objects, 50 ms late.
 
-Until 2026-09-30 every controller read the true state: true centroids and hulls at 100 Hz, and the staging
-beam could even be bypassed by the true front edge. Now the controllers get only:
+Until 2026-09-30 every controller read the true state: true centroids and hulls at 100 Hz. Since then (user:
+把控制依据换成现实能获得的信号) the cameras are modelled. Per 10 ms frame, per tracked OBJECT the controllers get:
+an estimated plan outline (convex polygon), its extents, the outline's area centroid (not the centre of mass: a
+camera cannot see that), the top height, the velocity from the track, a recognition confidence (conf; conf_seen
+is the same without the shape term: how surely the object is seen at all, whatever it holds), the estimated number
+of lumps in it, a track id and its lineage (the ids it was merged or split from).
 
-  * vision (Vision): the overhead cameras fused in world coordinates. Per 10 ms frame, per tracked OBJECT:
-    an estimated plan outline (convex polygon), its extents, the outline's area centroid (not the centre of
-    mass: a camera cannot see that), the top height, the velocity from the track, a recognition confidence
-    (conf; conf_seen is the same without the shape term: how surely the object is seen at all, whatever it
-    holds), the estimated number of lumps in it, a track id and its lineage (the ids it was merged or split from).
-    Frames reach the controllers LATENCY_S late. Lumps closer than SEG_GAP form one blob -- the cameras
-    cannot separate them; a blob counts as more than one lump when a merge of two tracks made it or when
-    its outline is clearly not convex. A merge adds up the counts of the tracks the cameras were still
-    following; a ghost -- a track no blob has matched for GHOST_S, left behind when the blob it followed came
-    apart -- adds nothing (2026-10-04). A blob that came apart keeps its lineage in its pieces, also when
-    neither piece lies near its centroid (SPLIT_PAD, 2026-10-04). A track that vanishes where lumps do not
-    leave the line is LOST: the
-    vision is then not healthy, and the controllers stop until every lost object is found again where it
-    was lost;
-  * beams (Beam): through-beams with a 20 ms debounce, injected faults, and three diagnoses by the cameras
-    and the timing alone: blocked longer than a lump can take (long block: a jam), blocked while the cameras
-    see the line clear (dirty or misaligned), never blocked while the cameras see a lump across it (dead);
-  * the volume scanner (Scanner): three depth heads over the measuring belt. It returns the volume (still
-    the ideal hull volume) and whether the scan is usable: exactly one object in the zone, wholly inside it,
-    seen by two heads, and a top surface one convex lump could have -- two touching lumps leave a valley
-    under the roof of their common hull deeper than SCAN_DEFECT.
+Frames reach the controllers machine.sensors.LATENCY_S late. Lumps closer than SEG_GAP form one blob -- the cameras
+cannot separate them; a blob counts as more than one lump when a merge of two tracks made it or when its outline
+is clearly not convex. A merge adds up the counts of the tracks the cameras were still following; a ghost -- a
+track no blob has matched for GHOST_S, left behind when the blob it followed came apart -- adds nothing
+(2026-10-04). A blob that came apart keeps its lineage in its pieces, also when neither piece lies near its
+centroid (SPLIT_PAD, 2026-10-04). A track that vanishes where lumps do not leave the line is LOST: the vision is
+then not healthy, and the controllers stop until every lost object is found again where it was lost.
 
-The true state enters here only to form the measurements (the scene the sensors look at). Every object
-keeps the lumps it was formed from in '_truth' (and '_com') for the verification written to result.json; no
-controller reads a key that starts with '_'. With --sensing oracle (for comparison) the controllers get the old
-ideal view: one object per lump, its true centroid and hull, geometric beams without debounce (what every
-run before 2026-09-30 used).
+The true state enters here only to form the measurements (the scene the cameras look at). Every object keeps the
+lumps it was formed from in '_truth' for the verification written to result.json; no controller reads a key that
+starts with '_'. With oracle=True (--sensing oracle, and the feed belt's view with --feeder-sensing oracle) the
+same interface delivers the ideal view: one object per lump, its true centroid and hull, no latency.
 
-Every number below is a placeholder for a prototype, not a measured property of a camera, scanner or beam.
-The noise is white per frame, equipment does not occlude, and the lumps are convex -- real coal is not,
-which flatters both the blob-shape test and the scanner's valley test.
+Every number below is a placeholder for a prototype, not a measured property of a camera. The noise is white per
+frame, equipment does not occlude, and the lumps are convex -- real coal is not, which flatters the blob-shape test.
 """
 import math
 from collections import deque
 
 import numpy as np
-from scipy.spatial import ConvexHull
 
-from . import devices
+from ..geom2d import box_gap, clip, hull2, inside, poly_area, poly_centroid
+from ..machine import sensors
 
-LATENCY_S = .05        # s: capture + processing; the controllers see the scene as it was this long ago
 POS_SIGMA = .005       # m: outline position noise per frame, per axis
 EDGE_SIGMA = .004      # m: outline size noise per frame (the outline grows or shrinks by about this)
 HEIGHT_SIGMA = .005    # m: top height noise
@@ -68,81 +54,6 @@ FAST = 1.0             # m/s: faster than this (falling, tumbling) blurs: confid
 CONF_OK = .6           # confidence a controller needs before it acts on an object
 VEL_WINDOW = .30       # s: velocity = least-squares slope of the centroid over this window
 RASTER = .01           # m: raster for the area of a blob of three or more lumps
-SCAN_RASTER = .005     # m: raster of the scanner's height map
-SCAN_DEFECT = .03      # m: a valley this deep under the hull roof = more than one lump
-SCAN_SIGMA = .003      # m: height-map noise of the scanner
-
-DEBOUNCE_S = .02       # s: a beam changes state only after the new level held this long
-DIAG_S = .50           # s: blocked this long while the cameras see the line clear = dirty; a lump seen across
-                       # the line this long without a block = dead
-
-
-# ---- plane geometry ------------------------------------------------------------------------------------
-def poly_area(P):
-    x, y = P[:, 0], P[:, 1]
-    return .5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
-
-
-def poly_centroid(P):
-    x, y = P[:, 0], P[:, 1]
-    xn, yn = np.roll(x, -1), np.roll(y, -1)
-    c = x * yn - xn * y
-    a = c.sum() / 2
-    if abs(a) < 1e-12:
-        return P.mean(0)
-    return np.array([((x + xn) * c).sum() / (6 * a), ((y + yn) * c).sum() / (6 * a)])
-
-
-def hull2(P):
-    """Convex hull of plan points, counter-clockwise (Andrew's monotone chain; points on an edge are dropped).
-    Until 2026-10-04 this was scipy's ConvexHull. On Windows scipy opens a temporary file for qhull's messages
-    at every call; at 600 calls per simulated second that was most of a run's wall time (23 s of 33 s, three lumps
-    for 8 s), and runs in parallel processes waited on each other for it (EXPERIMENTS.md S6)."""
-    P = np.asarray(P, float)
-    pts = sorted(set(map(tuple, P.tolist())))
-    half = []
-    for seq in (pts, pts[::-1]):                        # lower chain left to right, upper chain right to left
-        h = []
-        for p in seq:
-            while len(h) >= 2:
-                (ax, ay), (bx, by) = h[-2], h[-1]
-                if (bx - ax) * (p[1] - ay) > (by - ay) * (p[0] - ax):
-                    break                               # a left turn at b: b is on the hull so far
-                h.pop()
-            h.append(p)
-        half.append(h[:-1])
-    H = half[0] + half[1]
-    return np.array(H) if len(H) >= 3 else P            # degenerate (collinear) point set: as it is
-
-
-def inside(P, x, y, pad=0.):
-    """Which points (x, y) (scalars or arrays) lie inside the counter-clockwise convex polygon P grown by pad."""
-    e = np.roll(P, -1, 0) - P
-    n = np.stack([e[:, 1], -e[:, 0]], 1)                # outward normals
-    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
-    q = np.stack([np.asarray(x, float), np.asarray(y, float)], -1)
-    d = np.einsum('...ij,ij->...i', q[..., None, :] - P, n)
-    return np.all(d <= pad, axis=-1)
-
-
-def clip(P, Q):
-    """Intersection of two convex counter-clockwise polygons (Sutherland-Hodgman)."""
-    out = P
-    for i in range(len(Q)):
-        a, b = Q[i], Q[(i + 1) % len(Q)]
-        if not len(out):
-            break
-        side = lambda p: (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
-        res = []
-        for j in range(len(out)):
-            p, q = out[j], out[(j + 1) % len(out)]
-            sp, sq = side(p), side(q)
-            if sp >= 0:
-                res.append(p)
-            if sp * sq < 0:
-                res.append(p + (q - p) * (sp / (sp - sq)))
-        out = np.array(res)
-    return out
 
 
 def solidity(hulls):
@@ -165,37 +76,6 @@ def solidity(hulls):
     return float(inU[inH].sum()) / n if n else 1.
 
 
-def top_surface(V, X, Y):
-    """Top of the convex hull of the points V over the grid (X, Y); nan outside its plan outline."""
-    h = ConvexHull(V)
-    A, b = h.equations[:, :3], h.equations[:, 3]
-    x, y = X.reshape(-1, 1), Y.reshape(-1, 1)
-    rhs = -(b[None, :] + x * A[None, :, 0] + y * A[None, :, 1])          # a_z * z <= rhs, facet by facet
-    up, dn, side = A[:, 2] > 1e-9, A[:, 2] < -1e-9, np.abs(A[:, 2]) <= 1e-9
-    top = (rhs[:, up] / A[up, 2]).min(1)
-    bot = (rhs[:, dn] / A[dn, 2]).max(1) if dn.any() else np.full(len(x), -np.inf)
-    ok = top >= bot - 1e-9
-    if side.any():
-        ok &= np.all(rhs[:, side] >= -1e-9, axis=1)
-    return np.where(ok, top, np.nan).reshape(X.shape)
-
-
-def cuts_line(V, x, z):
-    """A beam across the belt at (x, z) meets the convex hull V exactly when (x, z) lies in the hull's
-    projection on the x-z plane."""
-    if not (V[:, 0].min() < x < V[:, 0].max() and V[:, 2].min() < z < V[:, 2].max()):
-        return False
-    h = ConvexHull(V[:, [0, 2]])
-    return bool(np.all(h.equations[:, :2] @ (x, z) + h.equations[:, 2] <= 0.))
-
-
-def box_gap(a, b):
-    """Plan gap between two objects' bounding boxes (0 when they overlap)."""
-    dx = max(0., max(a['x0'], b['x0']) - min(a['x1'], b['x1']))
-    dy = max(0., max(a['y0'], b['y0']) - min(a['y1'], b['y1']))
-    return math.hypot(dx, dy)
-
-
 def groups(ks, dist, together=frozenset()):
     """Lumps closer than SEG_GAP -- or SEG_GAP_OUT for pairs in `together` (one blob last frame) -- joined
     transitively: a list of lists of lump ids."""
@@ -216,7 +96,6 @@ def groups(ks, dist, together=frozenset()):
     return list(out.values())
 
 
-# ---- vision --------------------------------------------------------------------------------------------
 class Frame(dict):
     """One vision frame as the controllers get it: {tid: object}, with .t (when it was true) and .health."""
 
@@ -225,7 +104,7 @@ class Vision:
     """Fused overhead cameras -> tracked objects (see the module docstring)."""
 
     def __init__(self, cameras, rng, exits, oracle=False):
-        """cameras: devices.layout()['cameras']; rng: the noise stream; exits(x, y) -> True where a lump may
+        """cameras: machine.sensors.layout()['cameras']; rng: the noise stream; exits(x, y) -> True where a lump may
         leave the view normally (past the measuring belt: the separator and the bins)."""
         self.cams, self.rng, self.exits, self.oracle = cameras, rng, exits, oracle
         self.tracks, self.next_tid = {}, 0
@@ -251,7 +130,7 @@ class Vision:
         top = V[z >= z.min() + .5 * (z.max() - z.min())]
         seen = np.zeros(len(top), bool)
         for c in self.cams:
-            seen |= devices.in_view(c, top)
+            seen |= sensors.in_view(c, top)
         return float(seen.mean()), top[seen]
 
     def _blobs(self, t, lumps, dist):
@@ -326,7 +205,7 @@ class Vision:
     def frame(self, t, lumps, dist, com=None):
         """Advance one 10 ms frame. lumps: {k: world vertices} of every lump in the line (above the drop
         level, not taken off the line); com: {k: true centroid} -- the oracle's centroid, and the
-        verification's reference. Returns what the controllers see now (LATENCY_S old)."""
+        verification's reference. Returns what the controllers see now (sensors.LATENCY_S old)."""
         blobs = [self._measure(b) for b in self._blobs(t, lumps, dist)]
         if self.oracle:
             fr = Frame()
@@ -448,7 +327,7 @@ class Vision:
         if com is not None:
             self.audit(t, com)
         self.queue.append(fr)
-        while len(self.queue) > 1 and self.queue[1].t <= t - LATENCY_S + 1e-9:
+        while len(self.queue) > 1 and self.queue[1].t <= t - sensors.LATENCY_S + 1e-9:
             self.queue.popleft()
         self.latest = self.queue[0]
         return self.latest
@@ -489,128 +368,7 @@ class Vision:
                         p50=round(float(np.median(e)), 4), p95=round(float(np.percentile(e, 95)), 4),
                         max=round(float(e.max()), 4), frames=int(len(e)),
                         note='outline area centroid (what the controllers get) against the true centre of mass'),
-                    parameters=dict(latency_s=LATENCY_S, pos_sigma_m=POS_SIGMA, edge_sigma_m=EDGE_SIGMA,
+                    parameters=dict(latency_s=sensors.LATENCY_S, pos_sigma_m=POS_SIGMA, edge_sigma_m=EDGE_SIGMA,
                                     height_sigma_m=HEIGHT_SIGMA, seg_gap_m=SEG_GAP, solid_multi=SOLID_MULTI,
                                     conf_ok=CONF_OK, lost_after_s=LOST_S,
                                     note='placeholders; white noise per frame; no occlusion by equipment'))
-
-
-# ---- beams ---------------------------------------------------------------------------------------------
-class Beam:
-    """One through-beam: the line test on the scene, debounce, faults, diagnoses."""
-
-    def __init__(self, name, x, z, max_block_s, oracle=False):
-        self.name, self.x, self.z, self.max_block_s, self.oracle = name, x, z, max_block_s, oracle
-        self.blocked, self.raw, self.since, self.raw_since = False, False, 0., 0.
-        self.fault = None                                       # None, 'dead' (never blocks) or 'dirty' (always)
-        self.edges, self.alarm = [], None
-        self.t_dirty = self.t_dead = self.last_t = None
-        self.run_block = 0.                                     # s blocked while no block was planned
-
-    def sample(self, t, lumps):
-        """lumps: world vertices of every lump in the line. Returns the (debounced) state."""
-        raw = any(cuts_line(V, self.x, self.z) for V in lumps)
-        if self.fault == 'dead':
-            raw = False
-        elif self.fault == 'dirty':
-            raw = True
-        if raw != self.raw:
-            self.raw, self.raw_since = raw, t
-        if self.raw != self.blocked and t - self.raw_since >= (0. if self.oracle else DEBOUNCE_S) - 1e-9:
-            self.blocked, self.since = self.raw, t
-            self.edges.append((round(t, 3), 'block' if self.blocked else 'clear'))
-        return self.blocked
-
-    def blocks_since(self, t0):
-        return sum(1 for t, e in self.edges if e == 'block' and t >= t0 - 1e-9)
-
-    def diagnose(self, t, seen_clear, seen_across, expected_block=False):
-        """seen_clear: the cameras see nothing near the line; seen_across: they see a lump's body across it
-        (not just a nose or a tail); expected_block: a block is planned now (a lump staged at the line, or the
-        belt under it stopped), so it does not count toward a long block. Returns the alarm (None while
-        healthy); every alarm stops the line."""
-        dt = t - self.last_t if self.last_t is not None else 0.
-        self.last_t = t
-        if self.alarm is not None:
-            return self.alarm
-        if self.blocked:
-            self.t_dead = None
-            self.run_block = self.run_block + dt if not expected_block else self.run_block
-            if seen_clear:
-                self.t_dirty = self.t_dirty if self.t_dirty is not None else t
-                if t - self.t_dirty >= DIAG_S - 1e-9:
-                    self.alarm = dict(t_s=round(t, 3), beam=self.name, why='dirty',
-                                      note='blocked while the cameras see the line clear: dirty or misaligned')
-            else:
-                self.t_dirty = None
-                if self.run_block > self.max_block_s:
-                    self.alarm = dict(t_s=round(t, 3), beam=self.name, why='long_block',
-                                      note='something stays across the line longer than a lump takes to pass')
-        else:
-            self.t_dirty, self.run_block = None, 0.
-            if seen_across:
-                self.t_dead = self.t_dead if self.t_dead is not None else t
-                if t - self.t_dead >= DIAG_S - 1e-9:
-                    self.alarm = dict(t_s=round(t, 3), beam=self.name, why='dead',
-                                      note='the cameras see a lump across the line, the beam does not')
-            else:
-                self.t_dead = None
-        return self.alarm
-
-    def report(self):
-        return dict(name=self.name, x=round(float(self.x), 4), z=round(float(self.z), 4),
-                    max_block_s=self.max_block_s, blocks=sum(e[1] == 'block' for e in self.edges),
-                    fault=self.fault, alarm=self.alarm, edges=self.edges[-200:])
-
-
-# ---- volume scanner ------------------------------------------------------------------------------------
-class Scanner:
-    """The volume scanner over the measuring belt: the volume, and whether the scan is usable."""
-
-    def __init__(self, heads, zone, rng, oracle=False):
-        self.heads, self.zone, self.rng, self.oracle = heads, zone, rng, oracle
-        self.fail_on = set()                                 # injected: these scans (0, 1, ...) fail
-        self.scans = []
-
-    def scan(self, t, lumps, volume, dist, belt):
-        """lumps: {k: world vertices} of every lump reaching into the scan zone (the scene); volume(k): true
-        hull volume; dist(i, j): 3-D gap; belt: ((x0, y0), (x1, y1)) of the measuring belt between its skirts.
-        Returns the verdict; '_truth' is for the verification only."""
-        z0 = self.zone[0][2]
-        (x0, y0), (x1, y1) = belt
-        res = dict(t_s=round(t, 3), valid=True, reasons=[], volume_m3=None, objects=0, defect_m=None,
-                   _truth=tuple(sorted(lumps)))
-        if len(self.scans) in self.fail_on:
-            res.update(valid=False, reasons=['scan_failed'])
-            self.scans.append(res)
-            return res
-        self.scans.append(res)
-        gs = groups(sorted(lumps), dist)
-        res['objects'] = len(gs)          # (a single scan: no hysteresis)
-        if len(gs) != 1:
-            res.update(valid=False, reasons=['objects_in_zone_%d' % len(gs)])
-            return res
-        V = np.concatenate([lumps[k] for k in gs[0]])
-        if V[:, 0].min() < x0 or V[:, 0].max() > x1 or V[:, 1].min() < y0 or V[:, 1].max() > y1:
-            res['valid'] = False
-            res['reasons'].append('not_wholly_on_the_belt')
-        top = V[V[:, 2] >= V[:, 2].min() + .3 * (V[:, 2].max() - V[:, 2].min())]
-        if (sum(devices.in_view(h, top).astype(int) for h in self.heads) < 2).any():
-            res['valid'] = False
-            res['reasons'].append('coverage')
-        lo, hi = V[:, :2].min(0), V[:, :2].max(0)
-        X, Y = np.meshgrid(np.arange(lo[0] + SCAN_RASTER / 2, hi[0], SCAN_RASTER),
-                           np.arange(lo[1] + SCAN_RASTER / 2, hi[1], SCAN_RASTER))
-        roof = top_surface(V, X, Y)
-        surf = np.full(X.shape, z0)
-        for k in gs[0]:
-            surf = np.fmax(surf, np.nan_to_num(top_surface(lumps[k], X, Y), nan=z0))
-        if not self.oracle:
-            surf = surf + self.rng.normal(0., SCAN_SIGMA, surf.shape)
-        inroof = np.isfinite(roof)
-        res['defect_m'] = round(float(np.percentile((roof - surf)[inroof], 99.5)), 4) if inroof.any() else 0.
-        if res['defect_m'] > SCAN_DEFECT:
-            res['valid'] = False
-            res['reasons'].append('not_one_lump')
-        res['volume_m3'] = round(sum(volume(k) for k in gs[0]), 6)
-        return res

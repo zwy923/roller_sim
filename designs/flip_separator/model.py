@@ -17,7 +17,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from singulator.separator import Config, build, material_clearance, pose, state, verify  # noqa: E402,F401
+from singulator.machine.separator import Config, build, material_clearance, pose, state, verify  # noqa: E402,F401
 
 
 def render(model, data, c, out):

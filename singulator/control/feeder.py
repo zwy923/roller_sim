@@ -1,5 +1,6 @@
-"""Short stop-start feed belt with a step-down transfer in front of the plough (third version 2026-09-23; the
-line's feed since the gated mainline was deleted, 2026-09-30).
+"""Control of the feed belt: the batch is let go lump by lump over the step-down transfer in front of the plough
+(third version 2026-09-23; the line's feed since the gated mainline was deleted, 2026-09-30). The hardware is
+machine/feed_belt.py.
 
     feed belt (whole batch laid on it, own drive), its top feeder_step ABOVE the main belt
     -> main belt, straight run of feeder_gap -> plough face -> lane (0.60 m)
@@ -12,22 +13,6 @@ a lump overhanging the head edge still lies wholly on the feed belt -- the overh
 the main belt -- until its CENTROID passes the edge; then it tips onto the main belt, which takes it away.
 Hold-back is gravity, not friction, and it is by centroid for every lump: a lump beside the one that goes
 stays behind even when its front already overhangs.
-
-Hardware as modelled:
-  * feed belt as wide as the main belt (belt_w, same skirts), feeder_len long, its top feeder_step above the
-    main belt top, with a sharp head edge at x1 (the default). Since 2026-09-30 the transfer as
-    built can be modelled instead (user: 高差和交接位置做成可调): a driven head drum (feeder_head_d) whose top
-    is tangent to the flat run at x1, the main belt starting over its own tail pulley (feeder_tail_d) at
-    x_lower = x1 + feeder_handover, which must leave the two clear of each other (min_handover). With a real
-    drum and a small step the belts stand 0.1-0.25 m apart and a lump spans both; the bench trial
-    (singulator/trial.py, designs/transfer_trial/) is where that is measured;
-  * its own force-limited drive with a finite brake: feeder_speed on approach, feeder_creep_speed once the
-    leading lump's centroid is within CREEP_ZONE of the edge;
-  * a drop beam: a light beam across the belt BEAM_X past the edge at half the step height. A lump still
-    lying on the feed belt overhangs above it; one that tips cuts it. The beam is the stop signal;
-  * feeder_gap of main belt between the edge and the plough start: at least the longest plan extent of a
-    flat-lying lump plus the creep stopping distance, so a lump held up at the plough never still lies on
-    the feed belt.
 
 Control (one lump at a time; the camera only sets the creep, the beam stops):
   1. the whole batch is laid on the feed belt;
@@ -75,26 +60,13 @@ the edge at full feed speed while no release was on: nothing had judged whether 
 was booked to the release before (EXPERIMENTS.md S6). Led by the front edge a blob is staged with its front at the
 edge and crept from there until the beam is cut.
 
-Nothing here is calibrated. Both belts are plates with a prescribed surface velocity.
+The feed belt's own drive is force-limited with a finite brake (physics/drives.py): it runs at feeder_speed on
+approach and at feeder_creep_speed once the leading lump's centroid is within CREEP_ZONE of the edge. Nothing here
+is calibrated.
 """
-import math
+from ..sensing import vision
 
-import numpy as np
-
-from .perception import CONF_OK, SOLID_SURE
-
-DEFAULTS = dict(feeder_speed=.10, feeder_creep_speed=.03, feeder_step=.10, feeder_len=2.2, feeder_gap=.80,
-                feeder_ramp_s=.30, feeder_stall_s=.50, feeder_force_max=3000.)
-# The transfer as built (2026-09-30, user: 别把 50 mm 高差定死; 高差和交接位置做成可调). 0 = the idealised sharp
-# head edge right over the main belt's square start (the default):
-HEAD_DEFAULTS = dict(feeder_head_d=0.,      # m: head drum diameter of the feed belt (belt wrapped round it)
-                     feeder_tail_d=0.,      # m: tail pulley diameter of the belt below (its start)
-                     feeder_handover=0.)    # m: from the head drum's top tangent to where the belt below runs flat
-EQUIP_CLEAR = .01    # m: the head drum and the tail pulley below keep at least this apart
-FRONT_MARGIN = .05   # m: at t = 0 the batch's front edge is this far behind the head edge
-REAR_MARGIN = .02    # m: ... and its rear edge at least this far in front of the feed belt's tail end
 CREEP_ZONE = .05     # m: creep once the leading centroid is this close to the edge (covers camera error)
-BEAM_X = .10         # m: the drop beam lies this far past the head edge, at half the step height
 BEAM_MISS_S = 1.     # s: a release whose lump went without cutting the beam stops this long after it went
 STAGE_STOP = .016    # m: predictive release: staging stops this far short of the creep zone (stop from 0.10 m/s) ...
 STAGE_SLACK = .03    # ... and starts again only if the lead lies this much further back
@@ -103,7 +75,6 @@ V_STALL = .03        # m/s: a released lump slower than this holds the next rele
 RELEASE_MARGIN_S = 1.  # s: the next lump reaches the funnel mouth at least this long after the one before has left it
 TIP_S = .3           # s: from centroid over the edge to lying on the main belt
 CLEAR = .02          # m: a jog runs until the jogged lump's rear edge is this far past the edge
-OBS_DT = .01         # s: camera sample
 WENT_MARGIN = .05    # m: vision: an object is over the edge once its outline centroid is this far past it
                      # (the camera's centroid is up to ~4 cm off the centre of mass: seed 392, p95 2.6 cm) ...
 JUST_WENT = .25      # m: ... and has only just gone while it is less than this past it
@@ -115,58 +86,6 @@ NOSE_SHARE = 1 / 3   # vision: the lump in front of a blob has its centroid at l
 BLOB_FRAMES = 2      # vision: an outline that is not one convex lump this many frames running is a blob ...
 UNBLOB_FRAMES = 20   # ... until it has looked like one lump for this many
 
-
-def geometry(cfg, first_x):
-    """Feed belt from x0 to the head edge x1, feeder_step above the main belt. first_x: the plough start, the
-    first thing downstream that can hold a lump up."""
-    for k in DEFAULTS:
-        if not math.isfinite(cfg[k]) or cfg[k] <= 0:
-            raise ValueError('--%s must be finite and positive' % k.replace('_', '-'))
-    for k in HEAD_DEFAULTS:
-        if not math.isfinite(cfg.get(k, 0.)) or cfg.get(k, 0.) < 0:
-            raise ValueError('--%s must be finite and not negative' % k.replace('_', '-'))
-    v, vc, h, gap = cfg['feeder_speed'], cfg['feeder_creep_speed'], cfg['feeder_step'], cfg['feeder_gap']
-    R, r, hand = cfg.get('feeder_head_d', 0.) / 2, cfg.get('feeder_tail_d', 0.) / 2, cfg.get('feeder_handover', 0.)
-    need = min_handover(h, R, r)
-    if hand < need - 1e-9:
-        raise ValueError('--feeder-handover %.3f m: the head drum (D %.3f m) and the belt below (tail pulley D %.3f m, '
-                         '%.3f m lower) would collide; it needs at least %.3f m' % (hand, 2 * R, 2 * r, h, need))
-    if v >= cfg['v_belt']:
-        raise ValueError('--feeder-speed %.3g must be below the main belt speed %.3g: the faster main belt is '
-                         'what takes a released lump away from the rest' % (v, cfg['v_belt']))
-    if vc > v:
-        raise ValueError('--feeder-creep-speed %.3g must not exceed --feeder-speed %.3g' % (vc, v))
-    span = math.hypot(cfg['size_long_max'], cfg['size_max'])   # plan diagonal of a flat-lying lump, bound
-    stop = vc * cfg['feeder_ramp_s'] * (vc / v) / 2 + vc * OBS_DT   # ramp-down from creep + one camera sample
-    if gap < hand + span + stop:
-        raise ValueError('--feeder-gap %.3f m is shorter than the hand-over (%.3f m) + one lump (%.3f m plan extent) + '
-                         'the feed belt stopping distance (%.3f m): a lump held up at the plough could still lie on '
-                         'the feed belt' % (gap, hand, span, stop))
-    x1 = first_x - gap
-    head = {} if not (R or r or hand) else dict(
-        head=dict(drum_d_m=2 * R, tail_d_m=2 * r, handover_m=hand, min_handover_m=round(need, 4),
-                  drum_centre=[x1, None, round(h - R, 4)] if R else None,
-                  tail_centre=[x1 + hand, None, round(-r, 4)] if r else None))
-    return dict(x0=x1 - cfg['feeder_len'], x1=x1, length_m=cfg['feeder_len'], width_m=cfg['belt_w'],
-                **({} if not hand else dict(x_lower=x1 + hand)), **head,
-                gap_to_plough_m=gap, step_m=h, speed_m_s=v, creep_speed_m_s=vc, creep_zone_m=CREEP_ZONE,
-                main_to_feeder_speed_ratio=cfg['v_belt'] / v,
-                longest_plan_extent_m=round(span, 4), stop_distance_m=round(stop, 4),
-                stop_distance_basis='nominal ramp-down from creep plus one sample; not a bound under brake overload',
-                beam=dict(x=x1 + hand + BEAM_X, z=h / 2), release_rule='centroid past the head edge (the lump tips)')
-
-
-def min_handover(h, R, r, clear=EQUIP_CLEAR):
-    """Smallest horizontal distance from the head drum's top tangent (radius R, 0 = a sharp edge) to the
-    flat start of the belt below (tail pulley radius r, 0 = a square plate end) with the drum and the belt
-    below clear of each other. The feed belt top is h above the belt below."""
-    if R == 0. and r == 0.:
-        return 0.
-    if r == 0.:                     # the drum against the square end of the plate below (its top at 0)
-        return math.sqrt(max(0., R * R - (h - R) ** 2)) + clear if h < 2 * R else 0.
-    # the drum against the tail pulley: centres (0, h - R) and (x, -r)
-    dz = h - R + r
-    return math.sqrt(max(0., (R + r + clear) ** 2 - dz ** 2))
 
 
 class Feeder:
@@ -182,15 +101,15 @@ class Feeder:
         self.hist = {}                                  # (t, centroid x) per object, feeder_stall_s long
         self.counts = dict(after_stop=0, jogs=0, beam_missed=0)
         self.paused_at, self.held_s, self.miss_shift = None, 0., 0.   # station hold (see pause)
-        self.predict = cfg.get('feeder_release', 'lane') == 'predict'
+        self.predict = cfg['feeder_release'] == 'predict'
         self.staging = False
         # the cameras' objects, or the ideal view: one object per lump with its true centroid (--feeder-sensing
         # oracle, the default since 2026-10-05; --sensing oracle makes the whole line ideal)
-        self.vision = cfg.get('sensing', 'vision') == 'vision' and cfg.get('feeder_sensing', 'vision') == 'vision'
+        self.vision = cfg['sensing'] == 'vision' and cfg['feeder_sensing'] == 'vision'
         self.lumps_went = set()                         # vision: true lumps over the edge (verification)
         self.miss_streak = 0                            # released lumps in a row that passed the beam unseen
         self.across_hist = []                           # vision: (t, centroid x of the most advanced object across the edge)
-        self.nose_min = NOSE_SHARE * cfg.get('size_min', .30)
+        self.nose_min = NOSE_SHARE * cfg['size_min']
         self.blobs, self.blob_run = set(), {}           # vision: track ids that may hold several lumps (_mark_blobs)
         self.staged = False                             # the belt was run for staging since the last release stopped
         self.hang, self.jog_t0 = False, 0.              # vision: a release ended on the beam-miss fallback
@@ -475,7 +394,7 @@ class Feeder:
         for tid, o in view.items():
             several = o.get('n_est', 1) > 1
             n = self.blob_run.get(tid, 0)
-            n = max(n, 0) + 1 if several or o.get('solid', 1.) < SOLID_SURE else min(n, 0) - 1
+            n = max(n, 0) + 1 if several or o.get('solid', 1.) < vision.SOLID_SURE else min(n, 0) - 1
             self.blob_run[tid] = n
             if several or n >= BLOB_FRAMES:
                 self.blobs.add(tid)
@@ -516,7 +435,7 @@ class Feeder:
             if not (o['x1'] > x1 - STAGE_REACH and o['x0'] < self.lane_in):
                 continue
             blob = o.get('tid') in self.blobs and o['cx'] <= x1 + WENT_MARGIN
-            if o.get('coasting') or (o.get('conf_seen', o['conf']) if blob else o['conf']) < CONF_OK:
+            if o.get('coasting') or (o.get('conf_seen', o['conf']) if blob else o['conf']) < vision.CONF_OK:
                 return False
         return True
 
@@ -584,6 +503,10 @@ class Feeder:
             self.counts['stagings'] += 1
             self.events.append(dict(t_s=round(t, 3), event='staging'))
 
+    def geometry(self):
+        """The feed belt for result.json: the hardware with the creep zone this controller adds."""
+        return dict(self.g, creep_zone_m=CREEP_ZONE)
+
     def report(self):
         sizes = [len(r['lumps' if self.vision else 'members']) for r in self.releases
                  if r.get('lumps' if self.vision else 'members')]
@@ -595,7 +518,7 @@ class Feeder:
         after_stop = (sum(len(r.get('lumps_after_stop', [])) for r in self.releases) if self.vision
                       else self.counts['after_stop'])
         in_staging = sum(len(r.get('lumps_in_staging', [])) for r in self.releases)
-        return dict(geometry=self.g, releases=self.releases, events=self.events, final_phase=self.phase,
+        return dict(geometry=self.geometry(), releases=self.releases, events=self.events, final_phase=self.phase,
                     next_release_rear_past_x_m=round(self.lane_in, 4), released_order=went,
                     never_released=[k for k in range(self.n) if k not in went],
                     counts=dict(self.counts, after_stop=after_stop, in_staging=in_staging, releases=len(sizes),

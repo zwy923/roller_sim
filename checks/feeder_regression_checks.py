@@ -3,12 +3,12 @@
 Run: python checks/feeder_regression_checks.py
 FeederChecks (--feeder-release lane) / PredictiveRelease (the default): the oracle view (true centroids and
 hulls: --feeder-sensing oracle, the default since 2026-10-05, or --sensing oracle). VisionRelease: the camera
-path (--feeder-sensing vision) on camera objects (singulator/perception.py): the
+path (--feeder-sensing vision) on camera objects (singulator/sensing/vision.py): the
 centroid margin, the release judged by region because track ids churn at the head edge, objects the
 cameras cannot vouch for holding the release, no release while the drop beam is cut, the report of which
 lumps went, and blobs (lumps the cameras cannot tell apart) led by their front edge: staged and crept from it,
 not held for their uncertain count, a lump carried over by staging recorded. TransferStops: the feed belt's stop
-record (singulator/trial.py) on a synthetic belt.
+record (singulator/verify/transfer.py) on a synthetic belt.
 These checks establish controller decisions, not whether the step-down transfer works in hardware.
 """
 import sys
@@ -19,16 +19,19 @@ from types import SimpleNamespace
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from singulator import feeder, machine, perception, trial  # noqa: E402
 from singulator.config import parse_config  # noqa: E402
-from singulator.feeder import CLEAR, Feeder  # noqa: E402
+from singulator.control import feeder  # noqa: E402
+from singulator.control.feeder import CLEAR, Feeder  # noqa: E402
+from singulator.machine import derive  # noqa: E402
+from singulator.sensing.beams import cuts_line  # noqa: E402
+from singulator.verify.transfer import TransferWatch  # noqa: E402
 
 CFG = parse_config(['--feeder-release', 'lane', '--sensing', 'oracle', '--no-video'])
-D = machine.derive(CFG)
+D = derive(CFG)
 X, H = D['feeder']['x1'], D['feeder']['step_m']
 LANE_IN = D['lane_out_start']      # the next release waits for released rears to pass this
 CFGP = parse_config(['--sensing', 'oracle', '--no-video'])   # predictive release
-DP = machine.derive(CFGP)
+DP = derive(CFGP)
 
 
 def box(x0, x1, z0=H, z1=H + .3, y1=.6):
@@ -42,7 +45,7 @@ def observe(f, t, boxes, states=None, home=True, beam=None):
     b = f.g['beam']
     view = {k: dict(cx=float(V[:, 0].min() + V[:, 0].max()) / 2, x0=float(V[:, 0].min()), x1=float(V[:, 0].max()),
                     y1=float(V[:, 1].max())) for k, V in enumerate(boxes) if states[k] == 'on_belt'}
-    cut = any(states[k] == 'on_belt' and perception.cuts_line(V, b['x'], b['z']) for k, V in enumerate(boxes))
+    cut = any(states[k] == 'on_belt' and cuts_line(V, b['x'], b['z']) for k, V in enumerate(boxes))
     f.observe(t, view, cut if beam is None else beam, home)
 
 
@@ -64,7 +67,7 @@ class FeederChecks(unittest.TestCase):
         option, and --sensing oracle is ideal throughout."""
         cfg = parse_config(['--no-video'])
         self.assertEqual((cfg['sensing'], cfg['feeder_sensing']), ('vision', 'oracle'))
-        self.assertFalse(Feeder(cfg, machine.derive(cfg), 1).vision)
+        self.assertFalse(Feeder(cfg, derive(cfg), 1).vision)
         self.assertTrue(Feeder(CFGV, DV, 1).vision)
         self.assertFalse(Feeder(CFGP, DP, 1).vision)
         self.assertFalse(Feeder(parse_config(['--sensing', 'oracle', '--feeder-sensing', 'vision', '--no-video']),
@@ -255,9 +258,9 @@ class PredictiveRelease(unittest.TestCase):
 
 
 CFGV = parse_config(['--feeder-sensing', 'vision', '--no-video'])       # the cameras' view of the feed belt
-DV = machine.derive(CFGV)
+DV = derive(CFGV)
 CFGVL = parse_config(['--feeder-sensing', 'vision', '--feeder-release', 'lane', '--no-video'])   # ... 'lane' rule
-DVL = machine.derive(CFGVL)
+DVL = derive(CFGVL)
 
 
 def vobj(x0, x1, conf=1., vx=None, y1=.6):
@@ -430,18 +433,17 @@ class VisionRelease(unittest.TestCase):
 
 
 class TransferStops(unittest.TestCase):
-    """trial.TransferWatch's record of the feed belt's stops, on a synthetic belt (no lumps, no physics)."""
+    """TransferWatch's record of the feed belt's stops, on a synthetic belt (no lumps, no physics)."""
 
     def setUp(self):
         self.f = Feeder(CFGV, DV, 0)
-        self.w = trial.TransferWatch(CFGV, DV, SimpleNamespace(ngeom=0), [])
-        self.data, self.belts = SimpleNamespace(ncon=0), SimpleNamespace(feed=dict(f=.3))
+        self.w = TransferWatch(CFGV, DV, SimpleNamespace(ngeom=0), [])
+        self.data = SimpleNamespace(ncon=0)
         self.f.start(0.)
         self.f._stop(1., 'beam')                                      # the stop command, the belt at creep
 
     def see(self, t, speed):
-        self.belts.feed['f'] = speed
-        self.w.observe(t, self.data, self.f, self.belts)
+        self.w.observe(t, self.data, self.f, speed)      # speed: the feed belt drive's speed factor
 
     def test_a_stop_that_reaches_rest_is_measured(self):
         for i, speed in enumerate((.3, .2, .1, 0.)):

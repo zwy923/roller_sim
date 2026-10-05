@@ -1,9 +1,9 @@
 """Sensors of the line as hardware: every light beam and camera with its mount, housing
 and optics, and the regions each one must see. What the controllers read from them is modelled in
-singulator/perception.py (estimated outlines, debounced beams with their diagnoses, the scanner's verdict).
+singulator/sensing/ (estimated outlines, debounced beams with their diagnoses, the scanner's verdict).
 
   * a light beam is a through-beam pair: an emitter and a receiver housing just outside the skirts (the
-    skirt needs a slot at the beam), the beam drawn between them. Its line is the one perception.Beam
+    skirt needs a slot at the beam), the beam drawn between them. Its line is the one sensing.beams.Beam
     tests, so moving the beam here moves the signal;
   * a camera has a housing on a mast or gantry, a MuJoCo <camera> with its lens (vertical field of view,
     image aspect), and a list of regions -- boxes in which lumps must be visible -- that its controller
@@ -17,13 +17,15 @@ import math
 
 import numpy as np
 
+from .parts import LUMP_TOP, SKIRT
+
 BEAM_HOUSING = (.02, .025, .04)      # half sizes (x, y, z) of an emitter / receiver housing
 BEAM_LENS_UP = .012                  # the lens sits this far above the housing's bottom face
 CAMERA_HOUSING = (.07, .05, .045)
 HEAD_HOUSING = (.05, .04, .035)      # a depth head of the volume scanner
 POST = .03                           # half section of a mast / gantry post
-LUMP_TOP = .50                       # a lump reaches this high above the surface it lies on
 CAMERA = dict(fovy=45., aspect=16 / 9)       # overhead cameras (1920 x 1080)
+LATENCY_S = .05                      # s: capture + processing; the controllers see the scene as it was this long ago
 # longest a lump can keep a beam blocked while the belt under it runs (longer: something is stuck), s
 MAX_BLOCK_S = dict(beam_feed=6., beam_in=6., beam_stop=6., beam_gangue=2.)
 DEPTH = dict(fovy=50., aspect=4 / 3)         # scanner heads
@@ -60,7 +62,7 @@ def layout(cfg, d):
     """Beams, cameras and the volume scanner of the line, in world coordinates."""
     st, fd = d['station'], d['feeder']
     floor = st['separator']['floor_z']
-    T = .02                                                        # skirt thickness (machine.SKIRT)
+    T = SKIRT['thickness']
     # ---- beams: the line the controller tests, spanning between the housings' lenses ------------
     beams = [dict(name='beam_feed', role='feed belt: a lump tipped over the head edge stops the feed belt',
                   x=fd['beam']['x'], z=fd['beam']['z'], y0=cfg['lane_y'] - T, y1=cfg['belt_w'] + T, post=False,
@@ -160,7 +162,7 @@ def report(dev):
                 scanner=dict(heads=[cam(h) for h in dev['scanner']['heads']],
                              clear_height_m=round(dev['scanner']['clear_height'], 3),
                              min_views=dev['scanner']['min_views']),
-                note='placement and optics are assumptions; what the controllers read is modelled in perception.py')
+                note='placement and optics are assumptions; what the controllers read is modelled in singulator/sensing/')
 
 
 # ---- MJCF ---------------------------------------------------------------------------------------------

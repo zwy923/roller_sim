@@ -1,4 +1,4 @@
-"""Feed belt head + belt below, simulated bench (singulator/trial.py): a geometry x layout matrix.
+"""Feed belt head + belt below, simulated bench (singulator/verify/transfer.py): a geometry x layout matrix.
 
     python designs/transfer_trial/sweep.py                      # the default matrix, 6 workers
     python designs/transfer_trial/sweep.py --seeds 5 --workers 8
@@ -33,12 +33,12 @@ CASES = ('scatter', 'aligned', 'touching', 'flat', 'oblique')
 
 
 def one(job):
-    from singulator import feeder
     from singulator.config import parse_config
+    from singulator.machine.feed_belt import min_handover
     from singulator.simulate import run
     geo, case, seed, out = job
     h, D, d = GEOMETRIES[geo]
-    hand = 0. if not (D or d) else round(feeder.min_handover(h, D / 2, d / 2) + .005, 2)
+    hand = 0. if not (D or d) else round(min_handover(h, D / 2, d / 2) + .005, 2)
     args = ['--bench', '--layout', case, '--seed', str(seed), '--count', str(3 + seed % 3),
             '--feeder-step', str(h), '--feeder-head-d', str(D), '--feeder-tail-d', str(d),
             '--feeder-handover', str(hand), '--feeder-gap', str(round(.80 + hand, 3)), '--duration', '120',

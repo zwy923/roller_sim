@@ -8,7 +8,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from designs.flip_separator.model import Config, build, state, verify, material_clearance
-from singulator.separator import for_width
+from singulator.machine.separator import for_width
 from singulator.config import parse_config
 
 

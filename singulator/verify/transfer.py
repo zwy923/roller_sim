@@ -1,24 +1,15 @@
-"""Feed belt head + belt below: the bench layouts and the transfer record (--layout, --bench; 2026-09-30).
+"""The feed head's transfer record: what the bench trial measures, taken from the true state in every run.
 
 User, 2026-09-30: 先做"给料机头＋下游接带"小试，别把 50 mm 高差定死。用真实滚筒、实际耐磨带和实际煤矸，验证挂边、
 提前被下带拖走、两块同时翻落，以及带料停车距离；高差和交接位置做成可调。每批仍用实际场景的 3–5 块，反复试并齐、
 相贴、扁平和斜放情况。如果同放两块经常导致下游无法独立计量，就需要改变机械分离方式。
 
-The bench itself is hardware (designs/transfer_trial/DESIGN.md). This module runs the same questions in the
-model, to pick the geometries worth building and to set up the instrumentation: the line's feed belt with the
-transfer as built (--feeder-head-d, --feeder-tail-d, --feeder-handover, --feeder-step) and one of the bench's
-layouts on the feed belt (--layout; they work in a whole-line run too, and --bench ends the run once every
-lump lies on the main belt):
+The bench itself is hardware (designs/transfer_trial/DESIGN.md). The model runs the same questions to pick the
+geometries worth building and to set up the instrumentation: the line's feed belt with the transfer as built
+(--feeder-head-d, --feeder-tail-d, --feeder-handover, --feeder-step) and one of the bench's layouts on the feed belt
+(--layout, sim/layouts.py; --bench ends the run once every lump lies on the main belt).
 
-  scatter   the default layout of every run;
-  aligned   并齐: two or three lumps side by side, fronts level (within 5 mm), long axes along the belt,
-            the rest behind them;
-  touching  相贴: the batch pressed together -- two abreast and the rest nose to tail behind them, every
-            lump 3 mm from a neighbour (3-D, measured on the compiled model);
-  flat      扁平: every lump from the flat (tabular) family, scattered;
-  oblique   斜放: every lump turned 30-60 deg (either way) to the belt, scattered.
-
-TransferWatch records, in every run, from the true state (the bench's instrumentation, not a controller input):
+TransferWatch is that instrumentation, not a controller input. It records:
   tip        a lump's centroid passes the head tangent x1 (it goes);
   hang       挂边: a lump that went still rests on the feed belt or its head drum and has moved less than
              HANG_MOVE over HANG_S (hang_stuck_s: how long); hang_s is how long it touched the head after it went;
@@ -38,120 +29,16 @@ TransferWatch records, in every run, from the true state (the bench's instrument
 import math
 
 import mujoco
-import numpy as np
 
-from .feeder import FRONT_MARGIN, REAR_MARGIN
-from .lumps import block_world_vertices
+from ..machine import feed_belt, plough
 
 HANG_S = .50          # s: a lump that went, still on the feed belt / drum, that moved less than ...
 HANG_MOVE = .01       # m: ... this over the last HANG_S hangs on the head (挂边)
 DRAG_S = 1.0          # s: went within this of first touching the belt below, feed belt standing: dragged off
 SETTLE_X = .30        # m: 'wholly on the belt below' = rear this far past its flat start
 APART = .10           # m: closer than this to the lump before = one item at the station (station.GROUP_GAP)
-TOUCH = .003          # m: 3-D gap of 'touching' lumps in the touching layout
 
 
-def _place(model, data, L, x, y, zlow, yaw):
-    """Lump L flat (its generated frame) turned by yaw, plan box centred on (x, y), lowest point at zlow."""
-    L.place(data, x, y, 0., yaw)
-    data.qvel[L.v:L.v + 6] = 0.
-    mujoco.mj_forward(model, data)
-    V = block_world_vertices(data, dict(geom=L.geom, local=L.local))
-    data.qpos[L.q] += x - (V[:, 0].min() + V[:, 0].max()) / 2
-    data.qpos[L.q + 1] += y - (V[:, 1].min() + V[:, 1].max()) / 2
-    data.qpos[L.q + 2] += zlow - V[:, 2].min()
-    mujoco.mj_forward(model, data)
-    return block_world_vertices(data, dict(geom=L.geom, local=L.local))
-
-
-def _extent(model, data, L, yaw):
-    """Plan extents (dx, dy) of lump L turned by yaw."""
-    V = _place(model, data, L, 0., -5., 5., yaw)
-    return float(np.ptp(V[:, 0])), float(np.ptp(V[:, 1]))
-
-
-def arrange(cfg, d, model, data, lumps, rng):
-    """Lay the batch on the feed belt in the bench layout cfg['layout'] (scatter / flat: keep the layout
-    already placed; flat lumps come from make_blocks). Returns a description."""
-    case = cfg['layout']
-    if case in ('scatter', 'flat'):
-        return dict(case=case)
-    fd = d['feeder']
-    h, x1 = fd['step_m'], fd['x1']
-    zl = h + cfg.get('feed_drop_height', .006)
-    y_lo, y_hi = max(.03, cfg['lane_y'] + .005), cfg['belt_w'] - .03
-    front = x1 - FRONT_MARGIN
-    info = dict(case=case)
-    if case == 'oblique':
-        # every lump 30-60 deg to the belt, in rows from the head backwards, 2 cm apart
-        order = list(range(len(lumps)))
-        rng.shuffle(order)
-        yaws = {k: math.radians(rng.uniform(30., 60.)) * (1 if rng.random() < .5 else -1) for k in order}
-        _rows(model, data, lumps, order, front, y_lo, y_hi, zl, yaws.get, .02)
-        info['yaw_deg'] = {str(k): round(math.degrees(v), 1) for k, v in yaws.items()}
-    elif case == 'aligned':
-        # the widest set of two or three that fits across, long axes along the belt, fronts level
-        widths = {L.k: _extent(model, data, L, 0.) for L in lumps}
-        ks = sorted(widths, key=lambda k: widths[k][1])
-        n = 3 if len(ks) >= 3 and sum(widths[k][1] for k in ks[:3]) + .06 <= y_hi - y_lo else 2
-        row = ks[:n]
-        y = y_lo + rng.uniform(0., max(0., (y_hi - y_lo) - sum(widths[k][1] for k in row) - .03 * (n - 1)))
-        for k in row:
-            dx, dy = widths[k]
-            _place(model, data, lumps[k], front - dx / 2 - rng.uniform(0., .005), y + dy / 2, zl, 0.)
-            y += dy + rng.uniform(0., .03)
-        _rows(model, data, lumps, ks[n:], front - max(widths[k][0] for k in row) - .05, y_lo, y_hi, zl,
-              lambda k: 0., .05)
-        info.update(abreast=row)
-    elif case == 'touching':
-        # two abreast at the front, touching; the rest nose to tail behind the first, each touching the one ahead
-        ks = [L.k for L in lumps]
-        rng.shuffle(ks)
-        w = {k: _extent(model, data, lumps[k], 0.) for k in ks}
-        a, b = ks[0], ks[1]
-        ya = y_lo + .10
-        _place(model, data, lumps[a], front - w[a][0] / 2, ya + w[a][1] / 2, zl, 0.)
-        _place(model, data, lumps[b], front - w[b][0] / 2, ya + w[a][1] + w[b][1] / 2 + .01, zl, 0.)
-        _close(model, data, lumps[a], lumps[b], 1)
-        prev = a
-        for k in ks[2:]:
-            V = block_world_vertices(data, dict(geom=lumps[prev].geom, local=lumps[prev].local))
-            _place(model, data, lumps[k], float(V[:, 0].min()) - w[k][0] / 2 - .01,
-                   float(V[:, 1].mean()), zl, 0.)
-            _close(model, data, lumps[k], lumps[prev], 0)
-            prev = k
-        info.update(abreast=[a, b], nose_to_tail=[a] + ks[2:])
-    x_rear = min(float(block_world_vertices(data, dict(geom=L.geom, local=L.local))[:, 0].min()) for L in lumps)
-    if x_rear < fd['x0'] + REAR_MARGIN:
-        raise RuntimeError('trial layout %s does not fit on the %.2f m feed belt' % (case, fd['length_m']))
-    return info
-
-
-def _rows(model, data, lumps, ks, front, y_lo, y_hi, zl, yaw, gap):
-    """Lay lumps ks in rows across the belt from front backwards, gap apart."""
-    x, y, depth = front, y_lo, 0.
-    for k in ks:
-        dx, dy = _extent(model, data, lumps[k], yaw(k))
-        if y + dy > y_hi and y > y_lo:
-            x -= depth + gap
-            y, depth = y_lo, 0.
-        _place(model, data, lumps[k], x - dx / 2, y + dy / 2, zl, yaw(k))
-        y += dy + gap
-        depth = max(depth, dx)
-
-
-def _close(model, data, A, B, axis):
-    """Slide A along axis (0 = x, 1 = y) toward B until their 3-D gap is TOUCH."""
-    ft = np.zeros(6)
-    for _ in range(8):
-        gap = float(mujoco.mj_geomDistance(model, data, A.geom, B.geom, .5, ft))
-        if abs(gap - TOUCH) < .0005:
-            break
-        VA = block_world_vertices(data, dict(geom=A.geom, local=A.local))
-        VB = block_world_vertices(data, dict(geom=B.geom, local=B.local))
-        sign = 1. if VA[:, axis].mean() < VB[:, axis].mean() else -1.
-        data.qpos[A.q + axis] += sign * (gap - TOUCH)
-        mujoco.mj_forward(model, data)
 
 
 class TransferWatch:
@@ -162,14 +49,16 @@ class TransferWatch:
         self.cfg, self.fd, self.lumps = cfg, fd, lumps
         self.x1, self.x_lower = fd['x1'], fd.get('x_lower', fd['x1'])
         name = lambda g: mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, model.geom_bodyid[g]) or ''
-        self.feed_g = {g for g in range(model.ngeom) if name(g) in ('feeder', 'fdrum')}
-        self.lower_g = {g for g in range(model.ngeom) if name(g) in ('mfloor', 'mtail')}
+        self.feed_g = {g for g in range(model.ngeom) if name(g) in (feed_belt.BODY, feed_belt.DRUM)}
+        self.lower_g = {g for g in range(model.ngeom) if name(g) in (plough.MAIN_BELT, plough.TAIL)}
         self.rec = {L.k: dict(lump=L.k, t_tip=None, t_lower=None, lower_before_tip=False, hang_s=0.,
                               t_last_feed=None, gap_before_m=None) for L in lumps}
         self.stops, self.stop_now = [], None
         self.order = []
 
-    def observe(self, t, data, feeder, belts):
+    def observe(self, t, data, feeder, feed_f):
+        """One sample. feeder: the feed belt control (its releases and stops); feed_f: the feed belt drive's speed
+        factor now."""
         touch_feed, touch_lower = set(), set()
         gl = {L.geom: L.k for L in self.lumps}
         for i in range(data.ncon):
@@ -191,7 +80,7 @@ class TransferWatch:
             if L.k in touch_lower and r['t_lower'] is None:
                 r['t_lower'] = round(t, 3)
                 r['lower_before_tip'] = r['t_tip'] is None
-                r['feed_speed_at_contact'] = round(belts.feed['f'] * self.fd['speed_m_s'], 4)
+                r['feed_speed_at_contact'] = round(feed_f * self.fd['speed_m_s'], 4)
             if r['t_tip'] is not None and L.k in touch_feed:
                 r['t_last_feed'] = round(t, 3)
                 # hang: it went, still rests on the feed belt or its head drum, and has not moved HANG_MOVE over HANG_S
@@ -217,7 +106,7 @@ class TransferWatch:
             rel = feeder.releases[-1]
             on = [L.k for L in self.lumps if L.state == 'on_belt' and float(data.xipos[L.body][0]) < self.x1]
             self.stops.append(dict(release=rel['release'], why=rel['stop'], t_s=rel['t_stop_s'],
-                                   f0=round(belts.feed['f'], 3), travel_m=0.,
+                                   f0=round(feed_f, 3), travel_m=0.,
                                    x0={k: float(data.xipos[self.lumps[k].body][0]) for k in on}, done=False))
         for s in self.stops:
             if not s['done']:
@@ -230,8 +119,8 @@ class TransferWatch:
                                           else 'release'))
                     del s['x0']
                     continue
-                s['travel_m'] += belts.feed['f'] * self.fd['speed_m_s'] * .01
-                if belts.feed['f'] < 1e-4:
+                s['travel_m'] += feed_f * self.fd['speed_m_s'] * .01
+                if feed_f < 1e-4:
                     s['done'] = round(t, 3)
                     s['lump_slide_m'] = round(max((float(data.xipos[self.lumps[k].body][0]) - x
                                                   for k, x in s['x0'].items()), default=0.), 4)

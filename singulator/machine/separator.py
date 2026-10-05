@@ -6,8 +6,11 @@ end rises, the pivot stays put, and gangue drops through the gap between the fee
 Two users of the same geometry:
   * designs/flip_separator/model.py -- the standalone model (renders, interactive viewer, checks.json);
     build() is its whole MJCF, with the keyframes 'closed_coal' / 'open_gangue';
-  * the line (singulator/station.py) -- embed() places the same parts behind the
-    volume belt, names prefixed 'sep_', and place() poses the linkage in the running model.
+  * the line (machine/station.py, machine/assembly.py) -- embed() places the same parts behind the
+    measuring belt, names prefixed 'sep_', and place() poses the linkage in the running model.
+
+Config, layout() and state() are pure kinematics; everything that builds or poses a model imports MuJoCo when it
+is called, so the line's geometry (machine/layout.py) can be derived without it.
 
 The preview prescribes consistent joint positions (kinematics, not a load test).
 The MJCF contains an actual barrel hinge / piston slide / pin closure loop.
@@ -18,7 +21,6 @@ from dataclasses import asdict, dataclass
 import math
 import xml.etree.ElementTree as ET
 
-import mujoco
 import numpy as np
 
 # rib pitch of the standalone 1.20 m plate (11 ribs, 35 mm from each edge); a narrower plate keeps the pitch
@@ -103,6 +105,7 @@ def node(parent, tag, **kw):
 
 
 def build(c):
+    import mujoco
     p, fixed, lug = layout(c)
     root = ET.Element('mujoco', model='standalone_flip_separator')
     node(root, 'compiler', angle='radian', autolimits='true')
@@ -214,6 +217,7 @@ def build(c):
 
 
 def pose(model, data, c, deg):
+    import mujoco
     s = state(c, deg)
     for name, value in [('plate_hinge', math.radians(deg)),
                         ('barrel_hinge', s['barrel_angle_rad']), ('piston', s['piston_extension_m'])]:
@@ -264,6 +268,7 @@ def material_clearance(xml, c):
     assumed free-flight path from the upstream lip. Departure tipping is not solved.
     Only velocities 0.4/1.2 m/s and laterally contained probes are covered.
     """
+    import mujoco
     tree = ET.fromstring(xml)
     body = node(tree.find('worldbody'), 'body', name='clearance_probe', mocap='true')
     node(body, 'geom', name='clearance_probe_geom', type='sphere', size='.25',
@@ -328,17 +333,17 @@ def material_clearance(xml, c):
 
 # ---- in the line -----------------------------------------------------------------------------------
 PREFIX = 'sep_'
-MOVING = ('plate', 'barrel', 'rod')          # bodies of the linkage (prefixed in the line)
 
 
-def embed(c, origin, deck_friction):
+def embed(c, origin, deck_friction, secondary='.005 .0001'):
     """The standalone parts for the line: (worldbody XML, equality XML, actuator XML).
 
     Everything build() puts in the world except the light, the ground and the blue reference surface,
     wrapped in one static body at `origin` (the standalone origin: inlet edge x, plate centre line y,
     ground z) with childclass 'separator' (equipment: touches lumps only; steel, density 7850, joint
     damping 2 -- the standalone defaults). Every name gets the prefix 'sep_'. The deck and the ribs carry
-    `deck_friction` (the lining the material slides on)."""
+    `deck_friction` (the lining the material slides on) and the line's `secondary` (torsional and rolling)
+    coefficients."""
     root = ET.fromstring(build(c))
     wrap = ET.Element('body', {'name': PREFIX + 'frame', 'pos': fmt(origin), 'childclass': 'separator'})
     for el in root.find('worldbody'):
@@ -353,7 +358,7 @@ def embed(c, origin, deck_friction):
                     el.set(key, PREFIX + el.attrib[key])
     for el in wrap.iter('geom'):
         if el.get('name') == PREFIX + 'deck' or el.get('name', '').startswith(PREFIX + 'fixed_rib_'):
-            el.set('friction', '%.6g .005 .0001' % deck_friction)
+            el.set('friction', '%.6g %s' % (deck_friction, secondary))
     ET.indent(wrap)
     inner = lambda top: ''.join(ET.tostring(el, encoding='unicode') for el in top)
     return ET.tostring(wrap, encoding='unicode'), inner(equality), inner(actuator)

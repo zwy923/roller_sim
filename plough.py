@@ -11,8 +11,7 @@ def main():
     cfg = parse_config()
     out = run(cfg)
     o, g = out['outcome'], out['geometry']
-    face = (('curve %g->%g deg' % (g['curve_top_deg'], g['curve_exit_deg'])) if g['face_shape'] == 'curve'
-            else ('skew %.0f deg' % g['skew_deg']))
+    face = 'curve %g->%g deg' % (g['curve_top_deg'], g['curve_exit_deg'])
     st_g = g['station']
     print('%s  |  %s  face %.2f m  lane %.2f x %.2f m  | feed step %.2f m, station step %.2f m, buffer %.2f m at %.2f m/s'
           ' (main %.2f m/s)'

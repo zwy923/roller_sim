@@ -2,22 +2,18 @@
 
     feed belt -> main belt -> plough face -> lane -> buffer belt -> measuring belt -> flip separator
 
-Modules, in the order a run uses them:
-  config      command-line configuration (every default is the line)
-  lumps       shape families, material draws, feed layer, placed-lump outline geometry
-  machine     dimensions and derived geometry (feed belt, plough face, lane, belts, station, motion windows)
-  assembly    the MuJoCo model, and the moving-part clearance sweep
-  devices     beams, cameras and the volume scanner as hardware
-  drives      virtual motors, the conveyors, load bookkeeping
-  face        retract action of the hinged plough face
-  feeder      the step-down feed belt releasing the batch lump by lump
-  station     buffer belt, measuring belt (weight + volume) and the separator's control
-  separator   the flip separator's geometry, shared with the standalone model in designs/flip_separator/
-  perception  what the controllers read: camera objects, debounced beams, the scanner's verdict
-  line        sensors, held items taken off, injected faults, acceptance scenarios
-  trial       bench layouts of the batch and the feed head transfer record
-  tracking    per-lump observation and the stall rule
-  audit       shared per-lump measurement audit and result/CLI summary (no control feedback)
-  video       follow camera + plan view with a text overlay
-  simulate    run(): one batch through the machine, and its outputs
+The package in layers; a module imports only from the layers above its own:
+
+  config, tuning    every parameter of the line, defined once; changing a tunable constant for one run (--set)
+  lumps, geom2d, series, audit
+                    what a batch is made of; plane geometry; load summaries; the per-lump measurement audit
+  machine/          the hardware: where every section stands (pure geometry) and its MuJoCo model
+  physics/          the simulated plant: drives, actuators, the lumps' true state, numerical screening
+  sensing/          what the controllers can know: cameras, beams, volume scanner, load cells as models
+  control/          the controllers: feed belt, plough face, station
+  verify/           verification against the true state (feeds nothing back)
+  sim/              running a batch: layouts, scenarios, the run, video
+  simulate          run(cfg): the entry point (plough.py is its command line)
+
+docs/ARCHITECTURE.md describes the layers and how to replace a device model.
 """

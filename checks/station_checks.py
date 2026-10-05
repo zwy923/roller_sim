@@ -38,9 +38,14 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from singulator import assembly, devices, machine, perception, separator, simulate, station, tracking  # noqa: E402
-from singulator.config import parse_config  # noqa: E402
+from singulator import geom2d, machine, simulate  # noqa: E402
+from singulator.config import SAMPLE_S, parse_config  # noqa: E402
+from singulator.control import station  # noqa: E402
 from singulator.lumps import make_blocks, set_mass_properties  # noqa: E402
+from singulator.machine import assembly, sensors, separator, station as hw  # noqa: E402
+from singulator.physics.lumps import Lump  # noqa: E402
+from singulator.sensing import beams, vision  # noqa: E402
+from singulator.sensing.weigher import weigher_reading  # noqa: E402
 
 CFG = parse_config(['--no-video', '--weigh-model', 'steady'])    # Control drives the indicator; see Baseline
 D = machine.derive(CFG)
@@ -74,19 +79,19 @@ class Geometry(unittest.TestCase):
         self.assertAlmostEqual(MEND - XJ, CFG['measure_len'])
         self.assertAlmostEqual(TOP, -CFG['station_step'])
         self.assertAlmostEqual(ST['y_c'], CFG['lane_y'] + CFG['lane_w'] / 2)
-        self.assertEqual((S2_X, ST['beam_in']['z']), (EDGE + station.S2_X, TOP + station.S2_Z))
-        self.assertLessEqual(S2_X + station.S2_ROOM, STOP_X + 1e-9)     # a lump lies flat past S2 before S3
-        b_stop = CFG['buffer_speed'] * (station.RAMP_S / 2 + station.OBS_DT + perception.LATENCY_S)
-        self.assertAlmostEqual(XJ - STOP_X, max(station.STOP_BACK, b_stop + station.STAGE_ROOM))
-        self.assertAlmostEqual(ST['beam_stop']['z'], TOP + station.STOP_Z)
+        self.assertEqual((S2_X, ST['beam_in']['z']), (EDGE + hw.S2_X, TOP + hw.S2_Z))
+        self.assertLessEqual(S2_X + hw.S2_ROOM, STOP_X + 1e-9)     # a lump lies flat past S2 before S3
+        b_stop = CFG['buffer_speed'] * (hw.RAMP_S / 2 + SAMPLE_S + sensors.LATENCY_S)
+        self.assertAlmostEqual(XJ - STOP_X, max(hw.STOP_BACK, b_stop + hw.STAGE_ROOM))
+        self.assertAlmostEqual(ST['beam_stop']['z'], TOP + hw.STOP_Z)
         self.assertTrue(MEND < ST['beam_gangue']['x'] < sp['pivot'][0])
         self.assertLess(ST['beam_gangue']['z'], sp['inlet'][2] - .3)  # under the plate's closing sweep
         (zx0, _, zz0), (zx1, _, _) = ST['plate_zone']
         self.assertAlmostEqual(zx0, MEND, places=3)
         self.assertGreater(zx1, sp['outlet_closed'][0])
         self.assertLess(zz0, min(ST['beam_gangue']['z'], sp['outlet_closed'][2]))
-        self.assertAlmostEqual(sp['inlet'][0], MEND + station.GAP, places=3)
-        self.assertAlmostEqual(sp['inlet'][2] + SC.rib_height, TOP - station.DROP, places=3)
+        self.assertAlmostEqual(sp['inlet'][0], MEND + hw.GAP, places=3)
+        self.assertAlmostEqual(sp['inlet'][2] + SC.rib_height, TOP - hw.DROP, places=3)
         self.assertAlmostEqual(sp['inlet'][2] - sp['floor_z'], 1.45, places=3)
         self.assertEqual((SC.width, SC.rib_count), (.70, 7))
         self.assertTrue(sp['coal_slides_when_closed'])               # tan 20 deg > 0.20 lining
@@ -118,7 +123,7 @@ class Devices(unittest.TestCase):
         for key in ('beam_in', 'beam_stop', 'beam_gangue'):
             self.assertEqual((lines[key]['x'], lines[key]['z']), (ST[key]['x'], ST[key]['z']))
         for b in self.dev['beams']:
-            self.assertEqual(b['max_block_s'], devices.MAX_BLOCK_S[b['name']])
+            self.assertEqual(b['max_block_s'], sensors.MAX_BLOCK_S[b['name']])
             light = self.m.geom('dev_%s_light' % b['name'])
             self.assertAlmostEqual(self.d.geom_xpos[light.id][0], b['x'], places=4)
             self.assertAlmostEqual(self.d.geom_xpos[light.id][2], b['z'], places=4)
@@ -132,7 +137,7 @@ class Devices(unittest.TestCase):
     def test_cameras_see_what_their_controllers_use(self):
         self.assertEqual([c['name'] for c in self.dev['cameras']],
                          ['cam_feed', 'cam_singulator', 'cam_station', 'cam_separator'])
-        cov = devices.coverage(self.dev)
+        cov = sensors.coverage(self.dev)
         self.assertEqual({k: v for k, v in cov.items() if v}, {})
         for cam in self.dev['cameras'] + self.dev['scanner']['heads']:
             c = self.m.camera('dev_%s_view' % cam['name'])
@@ -181,13 +186,13 @@ class CompiledModel(unittest.TestCase):
             self.assertAlmostEqual(lo[0], ST[key]['x0'], delta=2e-4)
             self.assertAlmostEqual(hi[0], ST[key]['x1'], delta=2e-4)
             self.assertAlmostEqual(hi[1] - lo[1], .70, delta=2e-4)
-        cat = tracking.categorise(self.m)
-        kind = lambda test: {tracking.CATS[cat[g]] for g in range(self.m.ngeom) if test(self.m.geom(g).name,
+        cat = assembly.categorise(self.m)
+        kind = lambda test: {assembly.CATS[cat[g]] for g in range(self.m.ngeom) if test(self.m.geom(g).name,
                                                                                          self.m.body(self.m.geom_bodyid[g]).name)}
         self.assertEqual(kind(lambda g, b: b == 'mbelt' or g.startswith('mskirt')), {'weigher'})
         self.assertEqual(kind(lambda g, b: b == 'bbelt' or g.startswith('bskirt')), {'buffer'})
         self.assertEqual(kind(lambda g, b: g.startswith('dev_')), {'device'})
-        self.assertEqual(tracking.CATS[cat[self.m.geom('sep_deck').id]], 'separator')
+        self.assertEqual(assembly.CATS[cat[self.m.geom('sep_deck').id]], 'separator')
         self.assertAlmostEqual(self.m.geom_friction[self.m.geom('sep_deck').id][0], CFG['separator_friction'])
 
     def test_linkage_closes_in_both_positions(self):
@@ -216,30 +221,31 @@ class Weighing(unittest.TestCase):
         d = mujoco.MjData(m)
         set_mass_properties(blocks[0], m.body_mass[m.body('b0').id])
         separator.place(m, d, SC, SC.closed_deg)
-        L = tracking.Lump(m, 0)
+        L = Lump(m, 0)
         L.place(d, XJ + .45, ST['y_c'], TOP + .30, 0.)
         mujoco.mj_forward(m, d)
-        low = tracking.block_world_vertices(d, dict(geom=L.geom, local=L.local))[:, 2].min()
+        low = L.world(d)[:, 2].min()
         d.qpos[L.q + 2] += TOP + .002 - low                            # 2 mm above the measuring belt
         belts = [(m.jnt_qposadr[m.joint(j).id], m.jnt_dofadr[m.joint(j).id])
                  for j in ('mfloorj', 'feederj', 'bbeltj', 'mbeltj')]
-        weigher = {g for g in range(m.ngeom) if m.body(m.geom_bodyid[g]).name == 'mbelt'
-                   or m.geom(g).name.startswith('mskirt')}
+        weigher = assembly.weigh_frame(m)
+        self.assertEqual(weigher, {g for g in range(m.ngeom) if m.body(m.geom_bodyid[g]).name == 'mbelt'
+                                   or m.geom(g).name.startswith('mskirt')})      # M and its skirts
         loads = []
         for i in range(int(2. / m.opt.timestep)):
             for q, v in belts:                                        # every belt held at rest
                 d.qpos[q], d.qvel[v] = 0., 0.
             mujoco.mj_step(m, d)
             if i * m.opt.timestep > 1.:
-                loads.append(station.weigher_reading(m, d, weigher, {L.geom: 0}, load_only=True))
-        Fz, on, other = station.weigher_reading(m, d, weigher, {L.geom: 0})
+                loads.append(weigher_reading(m, d, weigher, {L.geom: 0}, load_only=True))
+        Fz, on, other = weigher_reading(m, d, weigher, {L.geom: 0})
         self.assertLess(abs(np.mean(loads) / station.G - blocks[0]['mass_kg']) / blocks[0]['mass_kg'], .005)
         self.assertEqual(on, {0})
         self.assertFalse(other.get(0, set()))                         # touches nothing off the weigh frame
 
 
 class Tracker(unittest.TestCase):
-    """perception.Vision's lump count of an object (n_est: the station holds an item 'multi' above 1)."""
+    """sensing.vision.Vision's lump count of an object (n_est: the station holds an item 'multi' above 1)."""
 
     def test_a_ghost_track_adds_no_lumps_to_a_merge(self):
         """A ghost: a track no blob has matched for a few frames -- what is left when a blob comes apart and its
@@ -248,7 +254,7 @@ class Tracker(unittest.TestCase):
         counted as 13 after 19 s (scatter 7001), and the station held it -- a single lump void."""
         lump = box(-1.5, -1.1, D['feeder']['step_m'], D['feeder']['step_m'] + .30, y0=.3, y1=.7)   # on the feed belt
 
-        v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
+        v = vision.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
         for i in range(3):
             v.frame(i * .01, {0: lump}, lambda a, b: 1.)
         (tr,) = v.tracks.values()
@@ -269,7 +275,7 @@ class Tracker(unittest.TestCase):
         z = D['feeder']['step_m']
         lump = lambda x: box(x, x + .50, z, z + .30, y0=.3, y1=.7)     # on the feed belt, 0.50 m long
 
-        v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
+        v = vision.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
         for i in range(3):
             v.frame(i * .01, {0: lump(-1.5), 1: lump(-2.)}, lambda a, b: 0.)        # touching: one blob
         (blob,) = v.tracks
@@ -282,7 +288,7 @@ class Tracker(unittest.TestCase):
 # ---- control on synthetic sensor signals --------------------------------------------------------------
 class Line:
     """Synthetic sensors for the station controller: every box (8 corners) is a lump and one camera object
-    (tid = its index) unless told otherwise; the beams are perception.Beam line tests on the boxes; the scanner
+    (tid = its index) unless told otherwise; the beams are sensing.beams.Beam line tests on the boxes; the scanner
     answers self.verdict; the load cell reads `load` (N)."""
 
     def __init__(self, densities=(1300., 2500., 1350.), cfg=CFG, d=D):
@@ -290,7 +296,7 @@ class Line:
                        for rho in densities]
         self.n = len(self.blocks)
         self.s = station.Station(cfg, d, self.blocks)
-        self.beams = {b['name']: perception.Beam(b['name'], b['x'], b['z'], b['max_block_s'], oracle=True)
+        self.beams = {b['name']: beams.Beam(b['name'], b['x'], b['z'], b['max_block_s'], oracle=True)
                       for b in d['devices']['beams']}
         self.t, self.verdict, self.scans = 0., dict(valid=True, reasons=[]), 0
         self.on_m = None
@@ -308,13 +314,13 @@ class Line:
         lineage of both); load: the measuring belt's force (N) for the physics steps since the last sample."""
         s = self.s
         self.t = round(self.t + .01, 4)
-        view = perception.Frame()
+        view = vision.Frame()
         for k, b in boxes.items():
             if merge and k == merge[1]:
                 continue
             V = np.concatenate([b, boxes[merge[1]]]) if merge and k == merge[0] else b
             P = V[:, :2]
-            o = dict(pts=perception.hull2(P), cx=float((P[:, 0].min() + P[:, 0].max()) / 2),
+            o = dict(pts=geom2d.hull2(P), cx=float((P[:, 0].min() + P[:, 0].max()) / 2),
                      cy=float((P[:, 1].min() + P[:, 1].max()) / 2), x0=float(P[:, 0].min()), x1=float(P[:, 0].max()),
                      y0=float(P[:, 1].min()), y1=float(P[:, 1].max()), ztop=float(V[:, 2].max()), solid=1., vis=1.,
                      _truth=(k,), tid=k, lineage=frozenset({k}), conf=1. if conf is None else conf.get(k, 1.),
@@ -672,7 +678,7 @@ class Control(unittest.TestCase):
         L, s = self.L, self.s
         boxes = {0: self.far(0)}
         L.beams['beam_stop'].fault = 'dirty'                            # reads blocked, nothing near it
-        for _ in range(int(perception.DIAG_S / .01) + 5):
+        for _ in range(int(beams.DIAG_S / .01) + 5):
             L.see(boxes)
         self.assertEqual((s.alarm['why'], s.fault['reason'], s.frozen), ('dirty', 'beam_dirty', True))
 
@@ -764,7 +770,7 @@ class Baseline(unittest.TestCase):
         cfg = parse_config(['--no-video'])
         self.assertEqual((cfg['sensing'], cfg['feeder_sensing'], cfg['weigh_model'], cfg['scan_s']),
                          ('vision', 'oracle', 'fixed', 1.))
-        self.assertEqual(machine.derive(cfg)['station']['measure']['weigh_model'], 'fixed')
+        self.assertEqual(station.Station(cfg, machine.derive(cfg), []).geometry()['measure']['weigh_model'], 'fixed')
 
     def test_the_fixed_device_reads_after_scan_s_whatever_the_reading_does(self):
         cfg = parse_config(['--no-video'])

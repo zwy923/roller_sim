@@ -1,8 +1,10 @@
 """Video: a camera following the batch (top) over an orthographic plan view (bottom), with a text overlay."""
-import numpy as np
-import mujoco
+from pathlib import Path
 
-from .config import FONT
+import mujoco
+import numpy as np
+
+FONT = Path(r'C:\Windows\Fonts\msyh.ttc')      # the overlay's Chinese font; without it the default font is used
 
 FACE_PHASE_ZH = dict(idle='常位', out='撤离中', hold='撤离保持', back='复位中', fault='犁面运动故障')
 FEEDER_PHASE_ZH = dict(feeding='放料', stopped='停（等放下的料进直道）', empty='已放空')

@@ -11,7 +11,9 @@ import numpy as np
 from scipy.spatial import ConvexHull
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from singulator import assembly, lumps, machine, simulate
+from singulator import lumps, simulate
+from singulator.machine import assembly, derive
+from singulator.sim import layouts
 from singulator.config import parse_config
 
 
@@ -22,7 +24,7 @@ class MaterialChecks(unittest.TestCase):
     def test_component_mass_and_volume_match_engine(self):
         cfg = self.cfg('--count', '30')
         blocks = lumps.make_blocks(cfg, np.random.default_rng(392))
-        model = mujoco.MjModel.from_xml_string(assembly.build_xml(cfg, machine.derive(cfg), blocks))
+        model = mujoco.MjModel.from_xml_string(assembly.build_xml(cfg, derive(cfg), blocks))
         self.assertEqual({b['material'] for b in blocks}, {'coal', 'middlings', 'gangue'})
         for k, b in enumerate(blocks):
             c = b['composition']
@@ -40,18 +42,18 @@ class MaterialChecks(unittest.TestCase):
     # sha256 (first 16 hex digits) of the default batch of a seed: every lump's vertices, material, density and
     # mass, and the scatter layout, rounded to 1e-9. Recorded on 2026-10-05 from the code of the S7 baseline
     # (source 400e934d). A seed means the same batch only as long as these hold: every result in EXPERIMENTS.md
-    # is tied to its seeds. If this fails after a change to lumps.py or to numpy's generator, either undo the
+    # is tied to its seeds. If this fails after a change to lumps.py, sim/layouts.py or to numpy's generator, either undo the
     # change to the random stream or accept that old seeds no longer reproduce, and say so in EXPERIMENTS.md.
     BATCH = {0: 'bda837ef3d19518b', 1: '693bf5a13053e71f', 392: '2078a34fdf5245a8', 7004: '6bb8c5db1b0ac0f2',
              7101: '07c66be10fed4a6d'}
 
     def test_a_seed_is_the_same_batch_as_before(self):
         cfg = self.cfg()
-        d = machine.derive(cfg)
+        d = derive(cfg)
         for seed, want in self.BATCH.items():
             rng = np.random.default_rng(seed)
             blocks = lumps.make_blocks(cfg, rng)
-            layer, _, _ = lumps.plan_scatter(cfg, blocks, rng, d)
+            layer, _, _ = layouts.plan_scatter(cfg, blocks, rng, d)
             h = hashlib.sha256()
             for b in blocks:
                 h.update((np.round(b['vertices'], 9) + 0.).tobytes())

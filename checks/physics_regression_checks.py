@@ -1,5 +1,4 @@
 """Physical regression probes. These verify mechanisms and diagnostics, not equipment performance."""
-import math
 import sys
 import tempfile
 import unittest
@@ -9,8 +8,14 @@ import mujoco
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from singulator import assembly, drives, face, lumps, machine, physics, simulate
+from singulator import lumps, simulate
 from singulator.config import parse_config
+from singulator.control.face import FaceRetract
+from singulator.machine import assembly, derive, plough
+from singulator.physics import drives
+from singulator.physics.actuators import FaceServo
+from singulator.physics.numerics import Diagnostics
+from singulator.sim import layouts
 
 
 class PhysicsChecks(unittest.TestCase):
@@ -18,7 +23,7 @@ class PhysicsChecks(unittest.TestCase):
         return parse_config(['--no-video', *args])
 
     def build(self, cfg, blocks=()):
-        d = machine.derive(cfg)
+        d = derive(cfg)
         m = mujoco.MjModel.from_xml_string(assembly.build_xml(cfg, d, blocks))
         data = mujoco.MjData(m)
         belts = drives.Conveyors(cfg, d, m)
@@ -28,13 +33,13 @@ class PhysicsChecks(unittest.TestCase):
 
     def test_layout_clears_actual_low_wall(self):
         cfg = self.cfg()
-        d = machine.derive(cfg)
+        d = derive(cfg)
         for seed in range(100):
             rng = np.random.default_rng(seed)
             b = lumps.make_blocks(cfg, rng)
-            layout, _, _ = lumps.plan_scatter(cfg, b, rng, d)
+            layout, _, _ = layouts.plan_scatter(cfg, b, rng, d)
             for k, x, y, z, yaw in layout:
-                fp = lumps.footprint(b[k]['vertices'], yaw)
+                fp = layouts.footprint(b[k]['vertices'], yaw)
                 self.assertGreaterEqual(y + fp[2], cfg['lane_y'] + .005 - 1e-12)
 
     def test_invalid_inputs_fail_before_build(self):
@@ -78,7 +83,7 @@ class PhysicsChecks(unittest.TestCase):
                 mujoco.mj_step(m, data)
                 impulse_x += data.qfrc_constraint[v]*dt
                 impulse_z += data.qfrc_constraint[v+2]*dt
-                reaction += data.qfrc_constraint[belt.main_dof]*dt
+                reaction += belt.main.load(data)*dt
             # An instantaneous horizontal velocity change excites soft normal contact and rocking:
             # N is NOT identically mg. Use measured normal impulse, including vertical momentum.
             self.assertAlmostEqual(impulse_x, -.4*impulse_z, delta=.001)
@@ -88,22 +93,21 @@ class PhysicsChecks(unittest.TestCase):
     def test_face_is_dynamic_and_torque_limited(self):
         cfg = self.cfg()
         d, m, data = self.build(cfg)
-        j, a = m.joint('facej').id, m.actuator('face_drive').id
-        q, v = int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])
-        f = face.FaceRetract(cfg, face.FaceServo(cfg, d, cfg['dt'], (q, v), a))
+        a, v = m.actuator(plough.FACE_ACTUATOR).id, int(m.jnt_dofadr[m.joint(plough.FACE_JOINT).id])
+        f = FaceRetract(cfg, FaceServo(cfg, d, m, data))
         self.assertEqual(m.dof_armature[v], 0.)
         f.start(0.)
         before = data.qpos.copy()
-        f.command(0., data)
+        f.command(0.)
         np.testing.assert_array_equal(data.qpos, before)  # commands cannot move a mechanism
         limit = cfg['face_force_max']*f.lever
         # External torque above actuator capacity prevents retraction, against the home stop.
         data.qfrc_applied[v] = 2*limit
         for _ in range(round(6.1/cfg['dt'])):
             t = data.time
-            f.command(t, data)
+            f.command(t)
             mujoco.mj_step(m, data)
-            f.record(t, data)
+            f.record(t)
             self.assertLessEqual(abs(data.actuator_force[a]), limit + 1e-8)
             if f.fault:
                 break
@@ -113,16 +117,14 @@ class PhysicsChecks(unittest.TestCase):
     def test_unloaded_face_cycle_reaches_home(self):
         cfg = self.cfg()
         d, m, data = self.build(cfg)
-        j = m.joint('facej').id
-        f = face.FaceRetract(cfg, face.FaceServo(cfg, d, cfg['dt'], (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])),
-                                                 m.actuator('face_drive').id))
+        f = FaceRetract(cfg, FaceServo(cfg, d, m, data))
         f.zone_busy = False
         f.start(0.)
         for _ in range(round(8/cfg['dt'])):
             t = data.time
-            f.command(t, data)
+            f.command(t)
             mujoco.mj_step(m, data)
-            f.record(t, data)
+            f.record(t)
             if f.phase in ('idle', 'fault'):
                 break
         self.assertEqual(f.phase, 'idle')
@@ -138,7 +140,7 @@ class PhysicsChecks(unittest.TestCase):
             '<body pos="0 0 .09"><freejoint/><geom type="sphere" size=".1"/></body></worldbody></mujoco>')
         data = mujoco.MjData(m)
         mujoco.mj_forward(m, data)
-        diag = physics.Diagnostics(m, cfg)
+        diag = Diagnostics(m, cfg)
         diag.observe(data, 0.)
         self.assertAlmostEqual(diag.peak, .01)
         self.assertFalse(diag.report(data)['ok'])
