@@ -86,9 +86,9 @@ PARAMS = {
         P('feeder_sensing', 'oracle', ('oracle', 'vision'),
           "what the feed belt controller reads (with --sensing vision): 'oracle' (default since 2026-10-05, user: "
           "给料直接读质心) = one object per lump with its true centroid and outline; 'vision' = the cameras' objects "
-          "like the rest of the line (lumps lying against each other are one object, led by its front edge). The "
-          "drop beam is the stop signal either way"),
-        P('feeder_stop', 'beam', ('beam', 'centroid'),
+          "like the rest of the line (lumps lying against each other are one object, led by its front edge). On the "
+          "camera path the drop beam stops the feed belt; with the true centroids --feeder-stop says what does"),
+        P('feeder_stop', 'centroid', ('beam', 'centroid'),
           "what ends a release once a lump is over the head edge: 'beam' = the feed belt creeps on until the lump "
           "tips into the drop beam S1; 'centroid' = it stops once the lump's centroid is control.feeder.STOP_PAST "
           "(3 mm) past the edge and the lump tips on its own (S8, docs/TODO.md section 1). 'centroid' needs the true "

@@ -44,7 +44,7 @@ class PhysicsChecks(unittest.TestCase):
 
     def test_touching_layout_lays_nothing_into_anything(self):
         """Until 2026-10-06 the touching layout closed each lump onto the one ahead only: it could reach into the
-        lump abreast (62 seeds in 7001-9000, up to 11.5 cm: 7134) or past the low-side skirt (7 seeds, 8.5 cm:
+        lump abreast (55 seeds in 7001-9000, up to 11.5 cm: 7134) or past the low-side skirt (7 seeds, 8.5 cm:
         7277), and the line refused those batches. Now they are laid clear; a layout that was clear is unchanged."""
         from singulator.sim.line import Line
         for seed, refit in ((7028, True), (7029, True), (7041, True), (7083, True), (7111, True), (7117, True),

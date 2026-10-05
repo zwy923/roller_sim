@@ -209,7 +209,7 @@ def _inside(model, data, A, y_lo, y_hi):
 
 def _clear(model, data, A, laid):
     """Lump A, just closed onto the lump ahead of it (_close), may reach into another one already laid: the one
-    abreast when that is the longer and A the wider (touching 7134: 11.5 cm into it; 62 seeds in 2000 laid lumps
+    abreast when that is the longer and A the wider (touching 7134: 11.5 cm into it; 55 seeds in 2000 laid lumps
     more than 1 mm into each other, which the line refused to run). Back A off along the belt until it is clear of
     every lump laid, then slide it forward until it is TOUCH from the first it meets. Each step forward is the gap
     left less TOUCH, and no lump is nearer than that gap, so A never reaches into one. True if it moved; a lump

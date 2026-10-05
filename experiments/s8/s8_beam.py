@@ -169,8 +169,8 @@ def main():
                         + run.vc * run.ramp * (run.vc / run.v) / 2
                     pushed = adv - needed <= DRAG_MARGIN
                     row.update(t2=t2, gap_s=round(t2 - t1, 3), needed=round(float(needed), 4),
-                               given=round(float(given), 4), advance=round(float(adv), 4), fate='kept' if pushed and needed <= given else
-                               'avoided' if pushed else 'dragged')
+                               given=round(float(given), 4), advance=round(float(adv), 4),
+                               fate='kept' if pushed and needed <= given else 'avoided' if pushed else 'dragged')
                 out[label(rule)].append(row)
     print('%d runs. The line\'s own beam replayed against the recorded stops: %d of %d beam stops within 15 ms'
           % (len(folders), check['same'], check['beam']))

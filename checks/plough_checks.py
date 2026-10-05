@@ -503,7 +503,7 @@ def main():
           'face blocked while retracting: fault at %.2f s, no closing attempted' % t_s)
 
     print('--- 12. feed belt: step-down transfer released lump by lump ---')
-    cq = config(feeder_release='lane', sensing='oracle')
+    cq = config(feeder_release='lane', sensing='oracle', feeder_stop='beam')     # the beam rule, not the default
     dq = derive(cq)
     fq = dq['feeder']
     check(raises(lambda: derive(config(feeder_speed=.40)))
@@ -616,8 +616,9 @@ def main():
     check(fe.phase == 'stopped' and fe.releases[0]['stop'] == 'feed_belt_empty',
           'a release with nothing left on the feed belt stops at once')
 
-    # physics: the first 12 s of a real batch on the line. One lump tips over, the beam stops the belt; the next
-    # release starts before that lump reaches the lane exit
+    # physics: the first 12 s of a real batch on the line. One lump tips over, the release stops -- on its centroid
+    # 3 mm past the edge by default since 2026-10-06 (S8), on the beam before; the next release starts before that
+    # lump reaches the lane exit
     with tempfile.TemporaryDirectory() as tmp:
         cr = config(seed=392, duration=12., out_dir=Path(tmp) / 'r')
         r = simulate.run(cr)
@@ -631,12 +632,13 @@ def main():
     lead = r['blocks'][went[0]] if len(went) == 1 else {}
     fcol = list(z['drive_names']).index('feeder')
     v_run = float(z['drive_f'][int(np.searchsorted(z['t'], 1.5)), fcol])
-    check(stop_t is not None and stop_t < 9. and rel0['stop'] == 'beam' and len(went) == 1
+    why = 'went' if cr['feeder_stop'] == 'centroid' else 'beam'
+    check(stop_t is not None and stop_t < 9. and rel0['stop'] == why and len(went) == 1
           and t_next is not None and t_next > stop_t and (lead.get('lane_tail_s') or 1e9) > t_next
           and abs(v_run - 1.) < .05 and r['numerics']['ok'],
-          'seed 392, first 12 s: lump %s tipped over the edge, the beam stopped the feed belt at %.2f s (drive at %.2f'
+          'seed 392, first 12 s: lump %s tipped over the edge, the feed belt stopped (%s) at %.2f s (drive at %.2f'
           ' of speed while approaching); the next release started at %.2f s, before that lump left the lane (%s)'
-          % (went, stop_t, v_run, t_next,
+          % (went, rel0['stop'], stop_t, v_run, t_next,
              'at %.2f s' % lead['lane_tail_s'] if lead.get('lane_tail_s') else 'not by 12 s'))
 
     print('\nwall heights: skirt/side belt %.2f m, plough %.2f m against lump screen size %.2f-%.2f m'

@@ -1,10 +1,11 @@
 # 实验文件入口
 
-当前工作是 **S7：固定基线的逐块独立测量验证**。结论见 [实验记录](../docs/EXPERIMENTS.md)，指标定义见 [计量段设计](../designs/station/DESIGN.md#独立测量验收口径)。
+当前工作是 **S8：给料机头一次放下多块**（S7 基线的唯一失败来源）。结论见 [实验记录](../docs/EXPERIMENTS.md)，指标定义见 [计量段设计](../designs/station/DESIGN.md#独立测量验收口径)。
 
 | 目录 | 用途 |
 |---|---|
-| [s7/](s7/README.md) | 当前基线的任务、分析和原始结果；结论数据在 `s7/results/out_valid_b/`、`s7/results/out_valid_c/` |
+| [s8/](s8/README.md) | 三种改法的任务清单、轨迹回放、同批配对比较；跑批和逐块审计沿用 `s7/` 的脚本。原始结果在运行机器的 `runs/`（不进 git） |
+| [s7/](s7/README.md) | S7 基线的任务、分析和原始结果；结论数据在 `s7/results/out_valid_b/`、`s7/results/out_valid_c/`；`s7_run.py`、`s7_analyze.py`、`s7_feed.py`、`s7_compare.py` 是共用的跑批与分析工具 |
 
 `s7/` 里是脚本、README、`REPORT.md`（完整记录）和 `results/`（原始结果，保留 `out*` 原组名）。`results/` 不进 git，只有本机这一份，需要长期保存请另行备份；每批结果的摘要里记着它自己的命令行参数和源码哈希。第 S6 节（历史结构与控制对比）只留下记录 [docs/history/EXPERIMENTS_S6.md](../docs/history/EXPERIMENTS_S6.md)；当时的脚本、源码快照和任务清单在 git 标签 `before-refactor` 上（见项目 [README](../README.md#2026-10-05-结构重构)）。
 

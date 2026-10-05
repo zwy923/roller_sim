@@ -27,6 +27,8 @@
 
 2026-10-05（用户）：线固定为一套**基线**，结构扫描和节拍优化暂停，先回答"这套结构能不能让每块料独立测量"。基线 = 下面的「当前结构」（出口 0.60 m）+ 给料带控制器直接读每块料的真实质心 + 计量装置按固定 1 s 的概念装置处理。主指标是**独立测量成功块数 / 全部投入块数**；结果在 [EXPERIMENTS.md](docs/EXPERIMENTS.md) 第 S7 节，有意推后的问题（读数稳定核验、相机控制给料、节拍等）记在 [TODO.md](docs/TODO.md)。
 
+2026-10-06（用户：修两处模型问题，处理机头一次放下多块）：给料机头改为**按质心停带**——头一块质心过机头 3 mm 就停，让料自己翻（`--feeder-stop centroid`，默认）。没见过的新种子上一次放下多块 10.8 % → 3.9 %，独立测成 97.0 % → 98.4 %；见 [EXPERIMENTS.md](docs/EXPERIMENTS.md) 第 S8 节。这条规则要毫米级地知道质心什么时候过边，基线读真值才做得到（[TODO.md](docs/TODO.md) 第 1 节）。
+
 ## 运行
 
 ```powershell
@@ -52,6 +54,8 @@ python experiments/s7/s7_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers
 python experiments/s7/s7_analyze.py runs/s7 --list                                    # 逐块审计：独立测量成功率、失败原因
 python experiments/s7/s7_compare.py experiments/s7/results/out_valid_b/baseline runs/s7/baseline   # 同一批任务跑两遍：逐批逐项是否相同
 python experiments/s7/s7_analyze_checks.py                                            # 逐块审计的自检（不跑物理）
+python experiments/s8/s8_jobs.py --seeds 7201-7260 --configs baseline,proposed --out runs/s8.json   # 旧线对新线
+python experiments/s8/s8_compare.py runs/s8 --configs baseline,proposed --list                      # 同批配对比较
 ```
 
 每次运行在 `runs/<名字>_<时间>/` 下保存：
@@ -65,7 +69,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 
 | 段 | 尺寸 | 作用 |
 |---|---|---|
-| **给料带** x −2.50 → −0.30 | 宽 1.20 m、长 2.20 m，顶面比主带高 **10 cm**；前送 0.10 m/s、慢走 0.03 m/s；落料光束 S1 在机头前 0.10 m | 整批暂存；质心过机头边缘的料自己翻下去，一次一块；按预测放下一块（控制器读每块料的真实质心，S1 停带） |
+| **给料带** x −2.50 → −0.30 | 宽 1.20 m、长 2.20 m，顶面比主带高 **10 cm**；前送 0.10 m/s、慢走 0.03 m/s；落料光束 S1 在机头前 0.10 m | 整批暂存；质心过机头边缘的料自己翻下去，一次一块；按预测放下一块（控制器读每块料的真实质心；头一块质心过边 3 mm 就停带，S1 只做诊断） |
 | **主带** x −0.30 → 2.24 | 宽 1.20 m，0.40 m/s（速度给定的保持位平板） | 送料，一直通到车道出口后的机头 |
 | **犁面** x 0.50 → 折弯 (1.29, 0.65) | 角度沿 y 从 55° 转到 20°（24 段折线），9 根 Ø90 自由竖辊，高 0.50 m，底缝 5 mm；最底下一根的下切线与车道外壁齐平 | 把料扫向低侧并拉出前后错位，错位预算 0.45 m |
 | **低侧侧带** x 0.37 → 2.24 | 1.5× = 0.60 m/s，覆盖整个漏斗和车道 | 给不出拱脚需要的向后反力；差速拆并排 |
@@ -77,7 +81,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 | **外挡边** | 止于 x 0.55，距犁面扫掠包络 10 mm | 留出犁面摆动窗口；撤离期间这段带边是敞开的 |
 
 驱动件：给料带、主带、侧带、缓冲带、计量带、犁面撤离执行器、排料板油缸；犁面竖辊不驱动。
-传感器：给料带相机、单列段相机、计量段相机、排料板相机，光电 S1–S4，三头体积扫描（实体在 `singulator/machine/sensors.py`，信号模型在 `singulator/sensing/`），控制器只读它们给出的信号（`--sensing vision`，默认）。两处例外是 2026-10-05 的基线定的：给料带控制器读每块料的真实质心和轮廓（`--feeder-sensing oracle`，默认；S1 仍是它的停带信号），计量装置停稳后固定 1 s 出数（`--weigh-model fixed`，默认）。
+传感器：给料带相机、单列段相机、计量段相机、排料板相机，光电 S1–S4，三头体积扫描（实体在 `singulator/machine/sensors.py`，信号模型在 `singulator/sensing/`），控制器只读它们给出的信号（`--sensing vision`，默认）。两处例外是 2026-10-05 的基线定的：给料带控制器读每块料的真实质心和轮廓（`--feeder-sensing oracle`，默认；2026-10-06 起它按质心停带，S1 只做诊断），计量装置停稳后固定 1 s 出数（`--weigh-model fixed`，默认）。
 
 2026-10-04 代码状态：
 - 相贴料团按前缘预送、慢走，避免用整团形心预送时把前一块提前推出机头；孤立单块仍按轮廓形心。（对照选项 `--blob-lead centroid` 已于 10-05 删除。）
@@ -90,7 +94,12 @@ python experiments/s7/s7_analyze_checks.py                                      
 - **给料读质心**（`--feeder-sensing oracle`）：给料带控制器不经过相机，直接读每块料的真实质心和轮廓；没有"料团"，慢走和放出都按质心判。相机控制给料（料团按前缘预送等）留在 `--feeder-sensing vision`。计量段、犁面仍读模拟相机和光电；`--sensing oracle` 是整条线都读真值的对照。
 - **计量固定 1 s**（`--weigh-model fixed`）：计量带停稳后 1 s 出数，取最后 0.5 s 的平均；读数稳不稳只记录（`steady`），不作废。原来"3 s 内读数稳定才出数、否则作废"的规则留在 `--weigh-model steady`。
 - 同日修了读质心路径上 S1 失效的误报（见文末「2026-10-04、10-05 修复」）。
-- 第 S6 节的批次是 10-04 的线。用现在的代码复现要带 `--lane-w .65 --feeder-sensing vision --weigh-model steady`。
+- 第 S6 节的批次是 10-04 的线。用现在的代码复现要带 `--lane-w .65 --feeder-sensing vision --weigh-model steady`（相机路径上总是光束停带，不受下面 10-06 的改动影响）。
+
+2026-10-06 基线（S8；上面几条仍然成立）：
+- **按质心停带**（`--feeder-stop centroid`）：给料带不再慢走到料翻下去挡住 S1，头一块质心过机头 3 mm（`control.feeder.STOP_PAST`）就停，料自己翻；挂边的料每次点动 5 mm（`JOG_STEP`）、再等 0.5 s。S1 在这条路径上只做诊断。原规则留在 `--feeder-stop beam`。
+- **早挡慢走**（`control.feeder.EARLY_BEAM_CREEP`）：本次放料还没有质心过边光束就被挡，慢走到有质心过边再停，不再反复起停。
+- 第 S7 节的批次是 10-05 的线。用现在的代码复现要带 `--feeder-stop beam --set control.feeder.EARLY_BEAM_CREEP=0`。
 
 **撤离**：犁面整体绕折弯端铰点铰接，撤离 −25°，相机判卡触发。复位要同时满足：区段走空；没有任何料的整块轮廓伸进犁面回位要扫过的区域（留 10 mm）。复位过程中每 10 ms 重查，有料进入就停在原位、退回保持。20 s（`--face-hold-max-s`）内得不到复位许可就停线（`jammed` / `retract_hold_timeout`），不带料强收；开始复位后 6 s 未到位记 `face_fault`。
 
@@ -147,7 +156,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - **接触参数尚未证明收敛**：默认 dt 0.25 ms、solref 2 ms；三档步长对照里部分工况清空时间仍敏感。
 - **料不可破碎，恢复系数未标定**；密度、摩擦、块形均是假设。
 - **给料机头默认是尖边**：实物是滚筒，两条带之间会有交接间距；滚筒、尾辊和交接间距已可建模（`--feeder-head-d` 等），哪种几何能用要先做台架小试。
-- **质心纵向齐平、并排翻下的两块**，缓冲带速差拉不开（它们同时落到快带上），只能作废停机、人工分开。基线下没测成的料全部出自给料机头一次放下了不止一块，其中质心真的齐平的是少数（第 S7 节）；拆不拆得开看两块过主带机头时错开多少（[S6 料块间距分析](docs/history/EXPERIMENTS_S6.md#三一对料拆不拆得开看过主带机头时错开多少)）。
+- **质心纵向齐平、并排翻下的两块**，缓冲带速差拉不开（它们同时落到快带上），只能作废停机、人工分开。基线下没测成的料几乎全部出自给料机头一次放下了不止一块；按质心停带之后剩下的主要是质心真的齐平的和被头一块拖过边的（第 S8 节）；拆不拆得开看两块过主带机头时错开多少（[S6 料块间距分析](docs/history/EXPERIMENTS_S6.md#三一对料拆不拆得开看过主带机头时错开多少)）。
 - **有意推后的问题**（机头一次放两块、读数稳定核验、相机控制给料、圆料在接缝处、节拍、模型本身的缺陷）集中记在 [TODO.md](docs/TODO.md)，每条写了现在怎么简化的、已经知道什么、什么时候该捡起来。
 - **停车不是无限制动**：给料带、缓冲带、计量带用有限制动力；报警后结束模拟，不模拟随后的滑行。
 - **相机、扫描、称重的模型偏乐观**（凸料、无遮挡、理想力传感），见 [designs/station/DESIGN.md](designs/station/DESIGN.md)「实物风险」。
@@ -201,6 +210,8 @@ experiments/
                        s7_feed.py（给料机头每次放料）、s7_analyze_checks.py（审计自检）
     REPORT.md          完整实验过程、结果表格与复现记录
     results/           原始摘要和压缩完整结果，保留 out* 组名（不进 git）
+  s8/                  第 S8 节，给料机头一次放下多块：s8_jobs.py（基线与三种改法的清单）、s8_beam.py（回放轨迹，
+                       估计换停带规则的效果）、s8_compare.py（同批配对比较）；跑批和审计用 s7/ 的脚本
 runs/                  新运行产物（不进 git）
 ```
 
@@ -220,6 +231,16 @@ runs/                  新运行产物（不进 git）
 - **重构前的代码和资料在 git 标签 `before-refactor`**（提交 `77c8907`）：当时的源码，第 S6 节的全部脚本，S6 / S7 的四份源码快照（`experiments/*/snapshots/`）、已保存的任务清单（`jobs/`）、过程记录（`archive/`）和 10-05 的文件整理记录。原始结果不在 git 里：S7 的还在 `experiments/s7/results/`，S6 的已删除。2026-10-06 起这些不再放在工作目录里。要用：先提交手头的改动，`git checkout before-refactor`，按那一版自己的 README 运行（`.venv` 和 `results/` 不受切换影响），用完 `git checkout main` 回来。
 - **改模块常量**不再在任务文件里写 `singulator.station.X`，改用 `--set control.station.X=值`（任务文件的 `"set"` 同理）；`python -m singulator.tuning` 列出全部可改的常量及其所在模块。
 - **换称重 / 体积装置**：`sensing/weigher.py` 的 `Weigher`、`sensing/volume.py` 的 `Scanner` 是工位控制器用到的全部接口，换实现不用动控制器。
+
+## 2026-10-06 修复
+
+S8 的准备和试验里修的，自检在 `checks/physics_regression_checks.py`、`checks/feeder_regression_checks.py`。
+
+| 项 | 修复前 | 修复后 |
+|---|---|---|
+| 相贴布料重叠 | 首尾相贴的料只往前面那一块上靠，不管并排的另一块：种子 7001–9000 的相贴布料 2000 批里 62 批初始重叠超过 1 mm（55 批料插进料，最深 11.5 cm；7 批伸进低侧挡边），线拒绝运行。S6、S7 因此少跑 6 批（原记录说"摆进设备"，不准） | 只在真有重叠时挪：横移回带宽内，或退到所有料后面再往前靠到 3 mm。没重叠的批布料逐位不变；8000 批修后初始重叠全为 0。拒绝运行时报出哪两个几何体重叠 |
+| 数值筛查把落仓算进去 | 所有接触取最大穿透：料从排料板落到地面（代表料仓）那一瞬间常到 3–6 mm，超过 5 mm 就 `ok=false`（S6：46 批超限里 41 批只是落仓；S8 的 1080 批里 9 批） | 穿透只筛设备上的接触；和地面、两块离线料之间的接触记在 `numerics.landed`，不算超限。仿真本身不变 |
+| 光束挡着时反复起停（读质心的路径） | 本次放料还没有质心过边、光束就被一块慢慢垂下机头的料挡住：停带，下一个采样又起放料，再被停（相贴 7125：2.8 s 里 53 次空放料） | 慢走到有质心过边再停（`EARLY_BEAM_CREEP`） |
 
 ## 2026-10-04、10-05 修复
 

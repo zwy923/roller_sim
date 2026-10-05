@@ -7,9 +7,9 @@ path (--feeder-sensing vision) on camera objects (singulator/sensing/vision.py):
 centroid margin, the release judged by region because track ids churn at the head edge, objects the
 cameras cannot vouch for holding the release, no release while the drop beam is cut, the report of which
 lumps went, and blobs (lumps the cameras cannot tell apart) led by their front edge: staged and crept from it,
-not held for their uncertain count, a lump carried over by staging recorded. StopPast: --feeder-stop centroid, a release stopped on
-the centroid a few mm past the edge (S8). EarlyBeam: the beam cut before any centroid is over (S8). TransferStops: the feed belt's stop
-record (singulator/verify/transfer.py) on a synthetic belt.
+not held for their uncertain count, a lump carried over by staging recorded. StopPast: --feeder-stop centroid, a
+release stopped on the centroid a few mm past the edge (S8). EarlyBeam: the beam cut before any centroid is over (S8).
+TransferStops: the feed belt's stop record (singulator/verify/transfer.py) on a synthetic belt.
 These checks establish controller decisions, not whether the step-down transfer works in hardware.
 """
 import sys
@@ -28,7 +28,7 @@ from singulator.sensing.beams import cuts_line  # noqa: E402
 from singulator.verify.feeder import FeederWitness  # noqa: E402
 from singulator.verify.transfer import TransferWatch  # noqa: E402
 
-CFG = parse_config(['--feeder-release', 'lane', '--sensing', 'oracle', '--no-video'])
+CFG = parse_config(['--feeder-release', 'lane', '--sensing', 'oracle', '--feeder-stop', 'beam', '--no-video'])
 D = derive(CFG)
 X, H = D['feeder']['x1'], D['feeder']['step_m']
 LANE_IN = D['lane_out_start']      # the next release waits for released rears to pass this
@@ -282,6 +282,12 @@ class StopPast(unittest.TestCase):
     control.feeder.STOP_PAST past the head edge instead of creeping on until the beam is cut; a lump that then hangs
     is jogged JOG_STEP at a time, each after feeder_stall_s without progress. The camera path cannot place the
     centroid that closely: there the beam ends every release."""
+
+    def test_the_default_since_2026_10_06(self):
+        """S8: the release stops on the centroid, and an early beam creeps on; S7 ran --feeder-stop beam with
+        EARLY_BEAM_CREEP 0."""
+        self.assertEqual(parse_config(['--no-video'])['feeder_stop'], 'centroid')
+        self.assertEqual(feeder.EARLY_BEAM_CREEP, 1)
 
     def test_the_rule_is_where_the_true_centroid_is_read(self):
         self.assertEqual(Feeder(CFGC, D).stop_past, feeder.STOP_PAST)

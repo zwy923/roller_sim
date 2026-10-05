@@ -17,7 +17,11 @@ stays behind even when its front already overhangs.
 Control (one lump at a time; the camera only sets the creep, the beam stops):
   1. the whole batch is laid on the feed belt;
   2. a release runs the feed belt at feeder_speed, creeps once the leading lump's centroid is within
-     CREEP_ZONE of the edge, and stops as soon as the beam is cut;
+     CREEP_ZONE of the edge, and stops as soon as the beam is cut. With --feeder-stop centroid (the default since
+     2026-10-06, true centroids only) it stops instead once the centroid that went is STOP_PAST past the edge, and
+     the lump tips on its own: creeping on until it had tipped into the beam (half a second, 1.6 cm at the median)
+     carried a second lump over in one release of eleven (S8). A beam cut before any centroid is over -- a lump
+     sagging over the edge -- then only means creep on (EARLY_BEAM_CREEP);
   3. a lump is released once its centroid is past the edge. Every lump released between the start of one
      release and the start of the next belongs to it; one that goes after the stop is counted
      ('after_stop'): its centroid was level with the one that went, within the stopping distance;
@@ -27,7 +31,8 @@ Control (one lump at a time; the camera only sets the creep, the beam stops):
      soon as the lump is in the straight lane). The next lump cannot catch up: it still has the creep zone,
      the drop and feeder_gap + the face to cover, over 1.5 m at no more than the main belt speed;
   5. fallbacks, counted: a released lump left hanging on the edge (rear still on the feed belt) with no
-     progress for feeder_stall_s gets a creep jog until its rear is CLEAR past the edge; a release whose
+     progress for feeder_stall_s gets a creep jog until its rear is CLEAR past the edge (--feeder-stop centroid:
+     JOG_STEP at a time, feeder_stall_s apart, so that a jog does not push the next lump over); a release whose
      lump went without cutting the beam stops BEAM_MISS_S after it went. That fallback says the lump is slow
      to tip, not that the beam is dead: the beam is taken for dead (the line stops) when two released lumps in
      a row have passed wholly beyond it while it never read blocked;
@@ -93,7 +98,7 @@ STOP_PAST = .003     # m: --feeder-stop centroid: a release stops once its leadi
 JOG_STEP = .005      # m: --feeder-stop centroid: a hang jog runs only until the jogged lump's centroid is this much
                      # further on, then waits feeder_stall_s for it to tip before the next (None: until its rear is
                      # clear, as with --feeder-stop beam)
-EARLY_BEAM_CREEP = 0  # 1: (the true centroid only) the beam cut before any centroid of the release is over the edge
+EARLY_BEAM_CREEP = 1  # 1: (the true centroid only) the beam cut before any centroid of the release is over the edge
                      # -- a lump sagging over the edge while still lying on the feed belt -- does not stop the release:
                      # it creeps on and stops once a centroid is over. 0: it stops at once, and the next release
                      # starts and is stopped again every sample (touching 7125: 53 releases, TODO.md section 1)
@@ -298,10 +303,11 @@ class Feeder:
                     **(dict(release='predict', funnel_mouth_x_m=round(self.funnel_in, 4),
                             release_margin_s=RELEASE_MARGIN_S, v_face_m_s=V_FACE) if self.predict else {}),
                     control='run at feeder_speed, creep once the leading centroid is within the creep zone, stop '
-                            'when the drop beam is cut' + ('' if self.stop_past is None else
-                                                          ' or the leading centroid is %.3f m past the head edge'
-                                                          % self.stop_past)
-                            + '; a lump is released once its centroid is past the head edge (it tips); ' + ('between releases the next lump is staged at the creep zone; the next '
+                            + ('when the drop beam is cut' if self.stop_past is None else
+                               'once the centroid that went is %.3f m past the head edge (the beam: before any did)'
+                               % self.stop_past)
+                            + '; a lump is released once its centroid is past the head edge (it tips); '
+                            + ('between releases the next lump is staged at the creep zone; the next '
                                              'release starts once every lump released before is predicted to be '
                                              'out of the funnel (rear past the lane entry) %.1f s before the next '
                                              'one reaches the funnel mouth, and the face is home' % RELEASE_MARGIN_S
