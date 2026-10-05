@@ -25,7 +25,7 @@ def main():
     p.add_argument('out', nargs='+')
     p.add_argument('--config', default='baseline')
     a = p.parse_args()
-    stops, sizes, tip, slow, empty, pairs = Counter(), Counter(), [], [], Counter(), []
+    stops, sizes, tip, slow, by_c, empty, pairs = Counter(), Counter(), [], [], [], Counter(), []
     nb = jogs = alarms = early = 0
     for fp in sorted(fp for out in a.out for fp in glob.glob(os.path.join(out, a.config, '*.result.json.gz'))):
         with gzip.open(fp, 'rt', encoding='utf-8') as fh:
@@ -52,8 +52,9 @@ def main():
             cut = [t for t in blocks if t >= rel['t_first_s'] - 1e-9]
             if rel['stop'] == 'beam' and rel['t_stop_s'] < rel['t_first_s']:
                 early += 1                                  # the beam was cut before any centroid was over the edge
-            elif cut:
-                (tip if rel['stop'] == 'beam' else slow).append(round(cut[0] - rel['t_first_s'], 2))
+            elif cut:   # 'went': --feeder-stop centroid stopped it before the beam (S8)
+                (tip if rel['stop'] == 'beam' else by_c if rel['stop'] == 'went' else slow).append(
+                    round(cut[0] - rel['t_first_s'], 2))
             if len(rel['members']) > 1:
                 ts = sorted(went[k] for k in rel['members'])
                 pairs.append(dict(tag=tag, lumps=rel['members'], gap_s=round(ts[1] - ts[0], 2),
@@ -82,6 +83,9 @@ def main():
           '质心还没过边光束就被挡的 %d 次' % (
               len(tip), q(tip, .5), q(tip, .9), max(tip or [float('nan')]), len(slow), min(slow or [float('nan')]),
               max(slow or [float('nan')]), q(slow, .5), early))
+    if by_c:
+        print('按质心停带（--feeder-stop centroid）的 %d 次：光束在头一块质心过边后 %.2f–%.2f s 被挡，中位 %.2f s，p90 %.2f s' % (
+            len(by_c), min(by_c), max(by_c), q(by_c, .5), q(by_c, .9)))
 
 
 if __name__ == '__main__':

@@ -7,7 +7,8 @@ path (--feeder-sensing vision) on camera objects (singulator/sensing/vision.py):
 centroid margin, the release judged by region because track ids churn at the head edge, objects the
 cameras cannot vouch for holding the release, no release while the drop beam is cut, the report of which
 lumps went, and blobs (lumps the cameras cannot tell apart) led by their front edge: staged and crept from it,
-not held for their uncertain count, a lump carried over by staging recorded. TransferStops: the feed belt's stop
+not held for their uncertain count, a lump carried over by staging recorded. StopPast: --feeder-stop centroid, a release stopped on
+the centroid a few mm past the edge (S8). EarlyBeam: the beam cut before any centroid is over (S8). TransferStops: the feed belt's stop
 record (singulator/verify/transfer.py) on a synthetic belt.
 These checks establish controller decisions, not whether the step-down transfer works in hardware.
 """
@@ -32,6 +33,7 @@ D = derive(CFG)
 X, H = D['feeder']['x1'], D['feeder']['step_m']
 LANE_IN = D['lane_out_start']      # the next release waits for released rears to pass this
 CFGP = parse_config(['--sensing', 'oracle', '--no-video'])   # predictive release
+CFGC = parse_config(['--feeder-release', 'lane', '--sensing', 'oracle', '--feeder-stop', 'centroid', '--no-video'])
 DP = derive(CFGP)
 
 
@@ -272,6 +274,88 @@ def vobj(x0, x1, conf=1., vx=None, y1=.6):
 def vblob(tid, x0, x1, solid=.80, n_est=2, conf=1., conf_seen=1.):
     """A blob: lumps lying against each other, one object to the cameras (its shape is not one convex lump's)."""
     return dict(vobj(x0, x1, conf=conf), tid=tid, solid=solid, n_est=n_est, conf_seen=conf_seen)
+
+
+
+class StopPast(unittest.TestCase):
+    """--feeder-stop centroid (TODO.md section 1, 改法二; S8): the release stops once its first centroid is
+    control.feeder.STOP_PAST past the head edge instead of creeping on until the beam is cut; a lump that then hangs
+    is jogged JOG_STEP at a time, each after feeder_stall_s without progress. The camera path cannot place the
+    centroid that closely: there the beam ends every release."""
+
+    def test_the_rule_is_where_the_true_centroid_is_read(self):
+        self.assertEqual(Feeder(CFGC, D).stop_past, feeder.STOP_PAST)
+        self.assertIsNone(Feeder(CFG, D).stop_past)             # --feeder-stop beam
+        cv = parse_config(['--feeder-sensing', 'vision', '--feeder-stop', 'centroid', '--no-video'])
+        self.assertIsNone(Feeder(cv, derive(cv)).stop_past)     # the cameras: the beam
+
+    def test_stops_on_the_centroid_before_the_beam(self):
+        f = Feeder(CFGC, D)
+        f.start(0.)
+        lump = lambda c: box(X + c - .30, X + c + .30)          # centroid c past the head edge, 0.60 long
+        behind = box(X - .70, X - .35)
+        observe(f, 0., [lump(-.002), behind])                   # creeping up to the edge
+        self.assertEqual(f.phase, 'feeding')
+        observe(f, .01, [lump(.002), behind])                   # over the edge, not yet STOP_PAST: running on
+        self.assertEqual((f.phase, f.released), ('feeding', [0]))
+        observe(f, .02, [lump(.0035), behind])                  # past STOP_PAST: stop, the beam never cut
+        self.assertEqual((f.phase, f.releases[0]['stop']), ('stopped', 'went'))
+
+    def test_a_hanging_lump_is_jogged_a_step_at_a_time(self):
+        f = Feeder(CFGC, D)
+        f.start(0.)
+        behind = box(X - .80, X - .40)
+        t, x0 = 0., X - .29
+        observe(f, t, [box(x0, x0 + .60), behind])               # went (centroid 1 cm past) ...
+        observe(f, t + .01, [box(x0, x0 + .60), behind])         # ... and stopped at once
+        self.assertEqual(f.releases[0]['stop'], 'went')
+        for i in range(2, 50):                                   # it does not move: no jog for feeder_stall_s
+            observe(f, t + i * .01, [box(x0, x0 + .60), behind])
+        self.assertIsNone(f.jog)
+        for i in range(50, 53):
+            observe(f, t + i * .01, [box(x0, x0 + .60), behind])
+        self.assertEqual(f.jog, 0)                               # 0.5 s without progress since the stop: jog
+        self.assertEqual(f.goal, f.creep)
+        observe(f, .54, [box(x0 + .006, x0 + .606), behind])     # 6 mm on: the step is done, wait again
+        self.assertIsNone(f.jog)
+        self.assertEqual(f.phase, 'stopped')
+        for i in range(55, 100):
+            observe(f, i * .01, [box(x0 + .006, x0 + .606), behind])
+        self.assertIsNone(f.jog)                                 # the next only feeder_stall_s after this one
+        for i in range(100, 108):
+            observe(f, i * .01, [box(x0 + .006, x0 + .606), behind])
+        self.assertEqual(f.jog, 0)
+        self.assertEqual(f.counts['jogs'], 2)
+
+
+class EarlyBeam(unittest.TestCase):
+    """control.feeder.EARLY_BEAM_CREEP (true centroid only): the beam cut before any centroid of the release is over
+    the edge -- a lump sagging over it while still on the feed belt -- does not stop the release; it creeps on and
+    stops once a centroid is over. Off, the release stopped at once and the next one started and was stopped again
+    every sample (touching 7125: 53 releases in 2.8 s, two lumps over meanwhile)."""
+
+    def run_it(self, flag):
+        old = feeder.EARLY_BEAM_CREEP
+        feeder.EARLY_BEAM_CREEP = flag
+        self.addCleanup(setattr, feeder, 'EARLY_BEAM_CREEP', old)
+        f = Feeder(CFGP, DP)                                      # predictive release, beam rule, true centroids
+        f.start(0.)
+        sag = box(X - .30, X + .26)                               # centroid 2 cm behind the edge, ...
+        for i in range(5):
+            observe(f, i * .01, [sag], beam=True)                 # ... yet the beam reads blocked
+        return f
+
+    def test_creeps_on_under_an_early_beam(self):
+        f = self.run_it(1)
+        self.assertEqual((f.phase, f.goal, len(f.releases)), ('feeding', f.creep, 1))
+        self.assertEqual(f.counts['early_beam'], 1)
+        observe(f, .05, [box(X - .27, X + .29)], beam=True)        # the centroid over: stop at once
+        self.assertEqual((f.phase, f.releases[0]['stop'], f.released), ('stopped', 'beam', [0]))
+
+    def test_off_it_stops_and_restarts(self):
+        f = self.run_it(0)
+        self.assertGreater(len(f.releases), 2)                    # a release a sample, each stopped by the beam
+        self.assertTrue(all(r['stop'] == 'beam' and not r['members'] for r in f.releases[:-1]))
 
 
 class VisionRelease(unittest.TestCase):

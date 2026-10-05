@@ -88,6 +88,15 @@ NOSE_SHARE = 1 / 3   # vision: the lump in front of a blob has its centroid at l
                      # side; 3000 generated lumps at any heading: 0.085 m at the least, 0.12 m for 999 in 1000)
 BLOB_FRAMES = 2      # vision: an outline that is not one convex lump this many frames running is a blob ...
 UNBLOB_FRAMES = 20   # ... until it has looked like one lump for this many
+STOP_PAST = .003     # m: --feeder-stop centroid: a release stops once its leading centroid is this far past the head
+                     # edge, and the lump tips on its own (TODO.md section 1, 改法二; S8)
+JOG_STEP = .005      # m: --feeder-stop centroid: a hang jog runs only until the jogged lump's centroid is this much
+                     # further on, then waits feeder_stall_s for it to tip before the next (None: until its rear is
+                     # clear, as with --feeder-stop beam)
+EARLY_BEAM_CREEP = 0  # 1: (the true centroid only) the beam cut before any centroid of the release is over the edge
+                     # -- a lump sagging over the edge while still lying on the feed belt -- does not stop the release:
+                     # it creeps on and stops once a centroid is over. 0: it stops at once, and the next release
+                     # starts and is stopped again every sample (touching 7125: 53 releases, TODO.md section 1)
 
 
 class Feeder:
@@ -116,6 +125,9 @@ class Feeder:
         # the cameras' objects, or the ideal view: one object per lump with its true centroid (--feeder-sensing
         # oracle, the default since 2026-10-05; --sensing oracle makes the whole line ideal)
         self.vision = cfg['sensing'] == 'vision' and cfg['feeder_sensing'] == 'vision'
+        # --feeder-stop centroid needs the true centroid: the cameras' outline centroid is off it by centimetres, so
+        # on the camera path the beam ends every release
+        self.stop_past = STOP_PAST if cfg['feeder_stop'] == 'centroid' and not self.vision else None
         self.reader = _Camera(self) if self.vision else _Ideal(self)
 
     def start(self, t):
@@ -190,8 +202,16 @@ class Feeder:
                 if why:
                     self.jog = None
                     self._stop(t, why)
+            elif beam_cut and EARLY_BEAM_CREEP and not self.vision and 't_first_s' not in rel:
+                if 't_early_beam_s' not in rel:         # nothing over yet: creep on until a centroid is
+                    rel['t_early_beam_s'] = round(t, 3)
+                    self.counts['early_beam'] = self.counts.get('early_beam', 0) + 1
+                self.goal = self.creep
             elif beam_cut:
                 self._stop(t, 'beam')
+            elif self.stop_past is not None and r.went_lead(rel) > x1 + self.stop_past:
+                self._stop(t, 'went')
+                r.forget()                              # it has feeder_stall_s from here to tip before a jog
             elif 't_first_s' in rel and t - rel['t_first_s'] - self.miss_shift > self.beam_miss_s:
                 self.counts['beam_missed'] += 1
                 r.missed()
@@ -266,7 +286,8 @@ class Feeder:
     # ---- result.json -----------------------------------------------------------------------------
     def geometry(self):
         """The feed belt for result.json: the hardware with the creep zone this controller adds."""
-        return dict(self.g, creep_zone_m=CREEP_ZONE)
+        return dict(self.g, creep_zone_m=CREEP_ZONE, **({} if self.stop_past is None else dict(
+            stop_rule='centroid', stop_past_m=self.stop_past, jog_step_m=JOG_STEP)))
 
     def report(self):
         """The controller's record. (Which lumps went, release by release, is added by verify.feeder.FeederWitness:
@@ -277,8 +298,10 @@ class Feeder:
                     **(dict(release='predict', funnel_mouth_x_m=round(self.funnel_in, 4),
                             release_margin_s=RELEASE_MARGIN_S, v_face_m_s=V_FACE) if self.predict else {}),
                     control='run at feeder_speed, creep once the leading centroid is within the creep zone, stop '
-                            'when the drop beam is cut; a lump is released once its centroid is past the head edge '
-                            '(it tips); ' + ('between releases the next lump is staged at the creep zone; the next '
+                            'when the drop beam is cut' + ('' if self.stop_past is None else
+                                                          ' or the leading centroid is %.3f m past the head edge'
+                                                          % self.stop_past)
+                            + '; a lump is released once its centroid is past the head edge (it tips); ' + ('between releases the next lump is staged at the creep zone; the next '
                                              'release starts once every lump released before is predicted to be '
                                              'out of the funnel (rear past the lane entry) %.1f s before the next '
                                              'one reaches the funnel mouth, and the face is home' % RELEASE_MARGIN_S
@@ -296,6 +319,7 @@ class _Ideal:
         self.f = f
         self.hist = {}                                  # (t, centroid x) per object, feeder_stall_s long
         self.view, self.q = {}, []
+        self.jog_from = None                            # centroid x of the jogged lump when its jog started
 
     def forget(self):
         self.hist = {}
@@ -328,6 +352,11 @@ class _Ideal:
     def lead(self):
         return max(self.view[k]['cx'] for k in self.q)
 
+    def went_lead(self, rel):
+        """The leading centroid of the lumps this release has put over the edge (-inf before any)."""
+        view = self.view
+        return max((view[k]['cx'] for k in rel['members'] if k in view), default=float('-inf'))
+
     def passed_unseen(self, rel):
         """A lump of this release lies wholly beyond the beam."""
         view, bx = self.view, self.f.g['beam']['x']
@@ -340,15 +369,23 @@ class _Ideal:
         pass
 
     def jog_over(self, t, jog, beam_cut):
-        """The jogged lump's rear is CLEAR past the edge (or it is gone from the view)."""
+        """The jogged lump's rear is CLEAR past the edge (or it is gone from the view); with JOG_STEP, also once its
+        centroid has gone JOG_STEP further: it is then given feeder_stall_s to tip before the next jog."""
         view = self.view
-        return 'jog_done' if jog not in view or view[jog]['x0'] > self.f.g['x1'] + CLEAR else None
+        if jog not in view or view[jog]['x0'] > self.f.g['x1'] + CLEAR:
+            return 'jog_done'
+        if JOG_STEP is not None and self.f.stop_past is not None and view[jog]['cx'] > self.jog_from + JOG_STEP:
+            self.forget()
+            return 'jog_step'
+        return None
 
     def jog_due(self, t):
         """A released lump the main belt did not take off the edge: across it, and no progress."""
         f, view, x1 = self.f, self.view, self.f.g['x1']
         hanging = [k for k in f.released if k in view and view[k]['x0'] < x1 < view[k]['x1']
                    and self._no_progress(k, t)]
+        if hanging:
+            self.jog_from = view[hanging[0]]['cx']
         return (hanging[0], dict(block=hanging[0])) if hanging else None
 
     def _no_progress(self, k, t):

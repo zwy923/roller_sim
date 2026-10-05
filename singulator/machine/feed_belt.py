@@ -15,8 +15,8 @@ Hardware as modelled:
     at x1, the main belt starting over its own tail pulley (feeder_tail_d) at x_lower = x1 + feeder_handover, which
     must leave the two clear of each other (min_handover). With a real drum and a small step the belts stand
     0.1-0.25 m apart and a lump spans both; the bench trial (designs/transfer_trial/) is where that is measured;
-  * a drop beam S1 across the belt BEAM_X past the edge at half the step height. A lump still lying on the feed
-    belt overhangs above it; one that tips cuts it. The beam is the feed belt's stop signal;
+  * a drop beam S1 across the belt BEAM_X past the edge at BEAM_Z of the step height (half of it by default). A lump
+    still lying on the feed belt overhangs above it; one that tips cuts it. The beam is the feed belt's stop signal;
   * feeder_gap of main belt between the edge and the plough start: at least the longest plan extent of a
     flat-lying lump plus the creep stopping distance, so a lump held up at the plough never still lies on the feed
     belt.
@@ -30,7 +30,9 @@ from .parts import plate_belt, pulley
 
 BODY, DRUM = 'feeder', 'fdrum'       # the belt plate (joint 'feederj') and its head drum (joint 'fdrumj')
 EQUIP_CLEAR = .01    # m: the head drum and the tail pulley below keep at least this apart
-BEAM_X = .10         # m: the drop beam lies this far past the head edge, at half the step height
+BEAM_X = .10         # m: the drop beam lies this far past the head edge ...
+BEAM_Z = .5          # ... at this share of the step height above the belt below (a lump lying on the feed belt
+                     # never reaches below its top: anything under 1 is clear of the queue)
 
 
 def geometry(cfg, first_x):
@@ -71,7 +73,7 @@ def geometry(cfg, first_x):
                 main_to_feeder_speed_ratio=cfg['v_belt'] / v,
                 longest_plan_extent_m=round(span, 4), stop_distance_m=round(stop, 4),
                 stop_distance_basis='nominal ramp-down from creep plus one sample; not a bound under brake overload',
-                beam=dict(x=x1 + hand + BEAM_X, z=h / 2), release_rule='centroid past the head edge (the lump tips)')
+                beam=dict(x=x1 + hand + BEAM_X, z=h * BEAM_Z), release_rule='centroid past the head edge (the lump tips)')
 
 
 def min_handover(h, R, r, clear=None):

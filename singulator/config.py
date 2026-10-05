@@ -88,6 +88,11 @@ PARAMS = {
           "给料直接读质心) = one object per lump with its true centroid and outline; 'vision' = the cameras' objects "
           "like the rest of the line (lumps lying against each other are one object, led by its front edge). The "
           "drop beam is the stop signal either way"),
+        P('feeder_stop', 'beam', ('beam', 'centroid'),
+          "what ends a release once a lump is over the head edge: 'beam' = the feed belt creeps on until the lump "
+          "tips into the drop beam S1; 'centroid' = it stops once the lump's centroid is control.feeder.STOP_PAST "
+          "(3 mm) past the edge and the lump tips on its own (S8, docs/TODO.md section 1). 'centroid' needs the true "
+          "centroid: on the camera path (--feeder-sensing vision) the beam ends the release whatever this says"),
     ],
     'main belt, plough face, lane': [
         P('belt_w', 1.2, float, 'clear belt width the stream arrives on'),
