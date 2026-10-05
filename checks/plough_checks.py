@@ -550,7 +550,7 @@ def main():
     def view(xs, zs=None):
         zs = zs or [(h, h + .3)] * len(xs)
         return [bx(a, b_, z0, z1) for (a, b_), (z0, z1) in zip(xs, zs)]
-    fd_ = feeder.Feeder(cq, dq, 3)
+    fd_ = feeder.Feeder(cq, dq)
     stt = ['on_belt'] * 3
     fd_.start(0.)
     xs = [(X - .45, X - .05), (X - .60, X + .02), (X - 1.2, X - .8)]     # 0 leads by centroid; 1 leads by front, overhanging
@@ -599,7 +599,7 @@ def main():
           and mujoco.mj_name2id(mline, mujoco.mjtObj.mjOBJ_GEOM, 'release_line') == -1,
           "the release line is drawn at the lane entry x %.3f with the 'lane' rule only, and nothing touches it" % Lin)
     # fallbacks: a lump that went without cutting the beam; a released lump hanging on the edge gets a creep jog
-    fm = feeder.Feeder(cq, dq, 2)
+    fm = feeder.Feeder(cq, dq)
     fm.start(0.)
     xs = [(X - .15, X + .25), (X - 1.2, X - .8)]
     for i in range(130):
@@ -610,7 +610,7 @@ def main():
     check(missed and jogging and fm.phase == 'stopped' and fm.jog is None and fm.releases[0]['stop'] == 'beam_missed',
           'a lump past the edge that never cuts the beam stops the release after %.1f s; left hanging across the edge'
           ' with no progress it gets a creep jog until its rear is %.2f m clear' % (feeder.BEAM_MISS_S, feeder.CLEAR))
-    fe = feeder.Feeder(cq, dq, 1)
+    fe = feeder.Feeder(cq, dq)
     fe.start(0.)
     oracle_observe(fe, 0.5, view([(X + .9, X + 1.3)]), ['passed'], True)
     check(fe.phase == 'stopped' and fe.releases[0]['stop'] == 'feed_belt_empty',

@@ -61,7 +61,7 @@ class Recorder:
         self.top.close()
 
 
-def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, station):
+def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, n_went, station):
     lines = [('主带 %.2f m/s  缓冲带 %.2f m/s  计量带 %.2f m/s  t=%5.1f s'
               % (cfg['v_belt'], cfg['buffer_speed'], cfg['station_speed'], t), True, (15, 20, 30)),
              ('尾缘过线%d/%d  同时过线%.2f s  主带驱动%.0f%%  犁面：%s'
@@ -74,8 +74,7 @@ def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, station):
              else FEEDER_PHASE_ZH[feeder.phase]) + (
         '（慢走）' if feeder.phase == 'feeding' and 0. < feeder.goal < 1. and feeder.jog is None else '') + (
         '（缓冲带满，暂停）' if feeder.paused else '')
-    went = feeder.lumps_went if feeder.vision else feeder.released
-    lines.append(('给料带：%s  第 %d 次放料  已放 %d/%d 块' % (state, len(feeder.releases), len(went), n_total),
+    lines.append(('给料带：%s  第 %d 次放料  已放 %d/%d 块' % (state, len(feeder.releases), n_went, n_total),
                   False, (30, 90, 70) if feeder.phase == 'feeding' else (90, 90, 100)))
     return lines + station_lines(station)
 

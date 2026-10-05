@@ -24,6 +24,7 @@ from singulator.control import feeder  # noqa: E402
 from singulator.control.feeder import CLEAR, Feeder  # noqa: E402
 from singulator.machine import derive  # noqa: E402
 from singulator.sensing.beams import cuts_line  # noqa: E402
+from singulator.verify.feeder import FeederWitness  # noqa: E402
 from singulator.verify.transfer import TransferWatch  # noqa: E402
 
 CFG = parse_config(['--feeder-release', 'lane', '--sensing', 'oracle', '--no-video'])
@@ -51,15 +52,16 @@ def observe(f, t, boxes, states=None, home=True, beam=None):
 
 class FeederChecks(unittest.TestCase):
     def test_overhanging_lump_waits_until_its_centroid_passes(self):
-        f = Feeder(CFG, D, 1)
-        self.assertTrue(f.waiting(0, 'on_belt', X - .01))      # front may be far over; centroid decides
-        self.assertFalse(f.waiting(0, 'on_belt', X + .01))
+        f = Feeder(CFG, D)
+        w = FeederWitness(f, 1)                                 # the lumps' record of waiting on the feed belt
+        self.assertTrue(w.waiting(0, 'on_belt', X - .01))      # front may be far over; centroid decides
+        self.assertFalse(w.waiting(0, 'on_belt', X + .01))
         f.start(0.)
         observe(f, 0., [box(X - .30, X + .25)])                 # centroid 2.5 cm behind: not released
         self.assertEqual(f.released, [])
         observe(f, .1, [box(X - .20, X + .35)])
         self.assertEqual(f.released, [0])
-        self.assertFalse(f.waiting(0, 'on_belt', X - .01))      # released lumps never count as waiting again
+        self.assertFalse(w.waiting(0, 'on_belt', X - .01))      # released lumps never count as waiting again
 
     def test_the_feed_belt_reads_true_centroids_by_default(self):
         """2026-10-05 (user: 给料直接读质心): on the default line this controller gets one object per lump with its
@@ -67,14 +69,14 @@ class FeederChecks(unittest.TestCase):
         option, and --sensing oracle is ideal throughout."""
         cfg = parse_config(['--no-video'])
         self.assertEqual((cfg['sensing'], cfg['feeder_sensing']), ('vision', 'oracle'))
-        self.assertFalse(Feeder(cfg, derive(cfg), 1).vision)
-        self.assertTrue(Feeder(CFGV, DV, 1).vision)
-        self.assertFalse(Feeder(CFGP, DP, 1).vision)
+        self.assertFalse(Feeder(cfg, derive(cfg)).vision)
+        self.assertTrue(Feeder(CFGV, DV).vision)
+        self.assertFalse(Feeder(CFGP, DP).vision)
         self.assertFalse(Feeder(parse_config(['--sensing', 'oracle', '--feeder-sensing', 'vision', '--no-video']),
-                                DP, 1).vision)
+                                DP).vision)
 
     def test_lump_released_during_a_jog_counts_as_after_stop(self):
-        f = Feeder(CFG, D, 2)
+        f = Feeder(CFG, D)
         f.start(0.)
         hang, behind = box(X - .15, X + .25), box(X - .40, X + .05)
         for i in range(130):                                   # beam never cut: stop, then jog the hanging lump
@@ -88,7 +90,7 @@ class FeederChecks(unittest.TestCase):
         self.assertEqual(f.phase, 'stopped')
 
     def test_beam_ignores_lumps_still_on_the_feed_belt_and_next_release_needs_lane_entry_and_face(self):
-        f = Feeder(CFG, D, 2)
+        f = Feeder(CFG, D)
         f.start(0.)
         observe(f, 0., [box(X - .30, X + .25), box(X - .9, X - .5)])
         self.assertEqual(f.phase, 'feeding')                    # the overhang passes above the beam
@@ -104,7 +106,7 @@ class FeederChecks(unittest.TestCase):
         self.assertEqual(f.releases[1]['t_start_s'], 7.)
 
     def test_station_hold_freezes_the_beam_miss_clock_and_progress(self):
-        f = Feeder(CFG, D, 1)
+        f = Feeder(CFG, D)
         f.start(0.)
         hang = box(X - .15, X + .25)                            # went, beam not cut: the miss clock runs
         observe(f, 0., [hang])
@@ -124,7 +126,7 @@ class FeederChecks(unittest.TestCase):
         """2026-10-05 (S7, 6 of 118 batches stopped with 'beam_dead'): the beam-miss fallback runs out 1 s after the
         centroid passed the edge; a lump that takes longer to tip cuts the beam after it. Two of those in a row are
         two lumps the beam has seen."""
-        f = Feeder(CFG, D, 2)
+        f = Feeder(CFG, D)
         f.start(0.)
         behind = box(X - .9, X - .5)
         for i in range(103):                                    # 0 went and hangs above the beam: the fallback stops
@@ -142,7 +144,7 @@ class FeederChecks(unittest.TestCase):
         self.assertEqual((f.releases[1].get('beam_seen'), f.miss_streak), (True, 0))
 
     def test_two_lumps_past_a_beam_that_never_reads_blocked_is_a_dead_beam(self):
-        f = Feeder(CFG, D, 3)
+        f = Feeder(CFG, D)
         BX = f.g['beam']['x']
         b1, b2 = box(X - .9, X - .5), box(X - 1.5, X - 1.1)
         f.start(0.)
@@ -161,7 +163,7 @@ class FeederChecks(unittest.TestCase):
         observe(f, 6.2, [gone, box(BX + CLEAR + .01, BX + .45, 0., .3), b2], beam=False)
         self.assertEqual(f.miss_streak, 2)                                           # simulate stops the line here
         # ... and a beam that reads blocked once is not dead
-        g = Feeder(CFG, D, 3)
+        g = Feeder(CFG, D)
         g.start(0.)
         observe(g, 0., [box(X - .15, X + .25), b1, b2], beam=False)
         observe(g, .8, [box(BX + CLEAR + .01, BX + .45, 0., .3), b1, b2], beam=False)
@@ -172,19 +174,19 @@ class FeederChecks(unittest.TestCase):
         self.assertEqual((g.miss_streak, g.releases[1]['stop']), (0, 'beam'))
 
     def test_feed_belt_empty_after_the_last_release(self):
-        f = Feeder(CFG, D, 1)
+        f = Feeder(CFG, D)
         f.start(0.)
         observe(f, 0., [box(X - .10, X + .40, 0., .3)])
         observe(f, 1., [box(X + 1., X + 1.4)], states=['passed'])
         self.assertEqual(f.phase, 'empty')
-        self.assertEqual(f.report()['counts']['releases'], 1)
+        self.assertEqual(FeederWitness(f, 1).report(f.report())['counts']['releases'], 1)
 
 
 class PredictiveRelease(unittest.TestCase):
     """--feeder-release predict (the default): staging, and the release by predicted funnel clearance."""
 
     def setUp(self):
-        self.f, self.t, self.q = Feeder(CFGP, DP, 2), 0., X - .80    # q: queued lump 1's rear (0.40 long)
+        self.f, self.t, self.q = Feeder(CFGP, DP), 0., X - .80    # q: queued lump 1's rear (0.40 long)
         self.rear = X - .15                                            # lump 0's rear on the main belt
         self.f.start(0.)
         self.see(box(X - .20, X + .35))                                # lump 0 goes over the edge ...
@@ -248,7 +250,7 @@ class PredictiveRelease(unittest.TestCase):
         for _ in range(100):                                          # stalled in the funnel
             self.see(box(1.0, 1.4, 0., .3, y1=.9))
         self.assertEqual(len(f.releases), 1)
-        g = Feeder(CFGP, DP, 2)
+        g = Feeder(CFGP, DP)
         g.start(0.)
         observe(g, 0., [box(X - .20, X + .35), box(X - .80, X - .40)])
         observe(g, .01, [box(X - .15, X + .40, 0., .3), box(X - .80, X - .40)])
@@ -274,7 +276,7 @@ def vblob(tid, x0, x1, solid=.80, n_est=2, conf=1., conf_seen=1.):
 
 class VisionRelease(unittest.TestCase):
     def test_gone_only_past_the_centroid_margin(self):
-        f = Feeder(CFGV, DV, 2)
+        f = Feeder(CFGV, DV)
         self.assertTrue(f.vision)
         f.start(0.)
         f.observe(0., {1: vobj(X - .17, X + .23)}, False, True)        # centroid 3 cm past: the camera's error
@@ -285,7 +287,7 @@ class VisionRelease(unittest.TestCase):
         self.assertEqual((f.phase, f.releases[0]['stop']), ('stopped', 'beam'))
 
     def test_a_lump_hanging_on_the_edge_under_new_ids_is_not_the_next_one(self):
-        f = Feeder(CFGV, DV, 2)
+        f = Feeder(CFGV, DV)
         f.start(0.)
         f.observe(0., {1: vobj(X - .12, X + .30), 500: vobj(X - .55, X - .13)}, True, True)
         for i in range(1, 45):                                        # stuck across the edge, a new id every frame
@@ -296,7 +298,7 @@ class VisionRelease(unittest.TestCase):
         self.assertEqual((len(f.releases), f.jog, f.counts['jogs']), (1, 'across', 1))   # no progress: jog it
 
     def test_an_object_the_cameras_cannot_vouch_for_holds_the_release(self):
-        f = Feeder(CFGV, DV, 2)
+        f = Feeder(CFGV, DV)
         f.start(0.)
         f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)
         staged = vobj(X - .55, X - .066 - .016)                        # the next lump, staged
@@ -314,7 +316,7 @@ class VisionRelease(unittest.TestCase):
         once and the beam stopped it one sample later, over and over (seed 392: four empty releases in 0.07 s)."""
         for cfg, d in ((CFGV, DV), (CFGVL, DVL)):                     # predictive rule, lane rule
             with self.subTest(release=cfg['feeder_release']):
-                f = Feeder(cfg, d, 2)
+                f = Feeder(cfg, d)
                 f.start(0.)
                 tipping = vobj(X - .22, X + .26)                      # centroid 2 cm past the edge: not gone yet
                 f.observe(0., {1: tipping}, True, True)               # its nose cuts the beam: stop
@@ -328,15 +330,16 @@ class VisionRelease(unittest.TestCase):
                 self.assertEqual((len(f.releases), f.phase), (2, 'feeding'))
 
     def test_the_report_names_the_lumps_that_went(self):
-        """The cameras' objects carry no lump identity, so f.released (the oracle path's) stays empty; the report
-        takes the lumps that went from the verification record. Until 2026-10-04 it listed every lump of a
-        vision run as never released, and counted none as gone after the stop."""
-        f = Feeder(CFGV, DV, 3)
+        """The cameras' objects carry no lump identity, so f.released (the ideal view's) stays empty; the report
+        takes the lumps that went from the witness's record (verify/feeder.py). Until 2026-10-04 it listed every
+        lump of a vision run as never released, and counted none as gone after the stop."""
+        f = Feeder(CFGV, DV)
+        w = FeederWitness(f, 3)
         f.start(0.)
-        f.audit(0., {0: X - .50, 1: X + .01, 2: X - .90})             # lump 1's true centroid is over the edge
+        w.observe(0., {0: X - .50, 1: X + .01, 2: X - .90})           # lump 1's true centroid is over the edge
         f.observe(.01, {7: vobj(X - .12, X + .30)}, True, True)       # the beam stops the release
-        f.audit(.02, {0: X + .02, 1: X + .20, 2: X - .90})            # lump 0 follows after the stop
-        r = f.report()
+        w.observe(.02, {0: X + .02, 1: X + .20, 2: X - .90})          # lump 0 follows after the stop
+        r = w.report(f.report())
         self.assertEqual(f.released, [])
         self.assertEqual((r['released_order'], r['never_released']), ([1, 0], [2]))
         self.assertEqual((r['counts']['after_stop'], r['counts']['lumps_per_release']), (1, {'2': 1}))
@@ -347,7 +350,7 @@ class VisionRelease(unittest.TestCase):
     def staged_blob(self, cfg):
         """The first lump has gone; a blob 0.70 m long is staged behind it (the face away: no release yet).
         Returns the feeder and where the blob's front edge stands when the staging stops."""
-        f = Feeder(cfg, DV, 3)
+        f = Feeder(cfg, DV)
         f.start(0.)
         f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)         # the first lump tips and cuts the beam
         front, t = X - .30, 1.
@@ -385,21 +388,21 @@ class VisionRelease(unittest.TestCase):
         self.assertEqual((f.phase, f.releases[1]['stop']), ('stopped', 'beam'))
 
     def test_an_outline_that_is_not_one_convex_lump_is_a_blob(self):
-        f = Feeder(CFGV, DV, 2)
+        f = Feeder(CFGV, DV)
         f.start(0.)
         def see(t, solid, n_est=1, tid=4):
             f.observe(t, {tid: vblob(tid, X - .90, X - .30, solid, n_est)}, False, True)
         see(0., .93)
-        self.assertEqual(f.blobs, set())                              # one frame: noise
+        self.assertEqual(f.reader.blobs, set())                              # one frame: noise
         see(.01, .93)
-        self.assertEqual(f.blobs, {4})                                # two running: a blob
+        self.assertEqual(f.reader.blobs, {4})                                # two running: a blob
         for i in range(feeder.UNBLOB_FRAMES - 1):                     # one convex lump again, not yet for long enough
             see(.02 + i * .01, .99)
-        self.assertEqual(f.blobs, {4})
+        self.assertEqual(f.reader.blobs, {4})
         see(.5, .99)
-        self.assertEqual(f.blobs, set())
+        self.assertEqual(f.reader.blobs, set())
         see(.51, .99, n_est=2, tid=5)                                 # counted as two: a blob at once
-        self.assertEqual((f.blobs, set(f.blob_run)), ({5}, {5}))      # and the track that ended is forgotten
+        self.assertEqual((f.reader.blobs, set(f.reader.blob_run)), ({5}, {5}))      # and the track that ended is forgotten
 
     def test_a_blob_of_uncertain_count_does_not_hold_the_release(self):
         """Its shape says neither one lump nor two (confidence halved), but it is seen well (conf_seen). Led by
@@ -407,7 +410,7 @@ class VisionRelease(unittest.TestCase):
         as it looked so.) One that is not seen well does hold it."""
         for conf_seen, releases in ((1., 2), (.3, 1)):
             with self.subTest(conf_seen=conf_seen):
-                f = Feeder(CFGV, DV, 3)
+                f = Feeder(CFGV, DV)
                 f.start(0.)
                 f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)
                 front = X - feeder.CREEP_ZONE - feeder.STAGE_STOP + feeder.NOSE_SHARE * CFGV['size_min']    # staged
@@ -417,17 +420,18 @@ class VisionRelease(unittest.TestCase):
                 self.assertEqual(len(f.releases), releases)
 
     def test_a_lump_carried_over_by_staging_is_recorded(self):
-        f = Feeder(CFGV, DV, 3)
+        f = Feeder(CFGV, DV)
+        w = FeederWitness(f, 3)
         f.start(0.)
-        f.audit(0., {0: X + .01, 1: X - .40, 2: X - .90})             # lump 0 goes in the release
+        w.observe(0., {0: X + .01, 1: X - .40, 2: X - .90})           # lump 0 goes in the release
         f.observe(.01, {7: vobj(X - .12, X + .30)}, True, True)       # the beam stops it
-        f.audit(.02, {1: X + .01, 2: X - .90})                        # lump 1 follows within the stopping distance
+        w.observe(.02, {1: X + .01, 2: X - .90})                      # lump 1 follows within the stopping distance
         f.observe(1., {8: vobj(X + .5, X + .9, vx=.4), 9: vobj(X - .90, X - .50)}, False, False)
         self.assertTrue(f.staging)
-        f.audit(1.5, {2: X + .01})                                    # lump 2 goes while the belt is staging
+        w.observe(1.5, {2: X + .01})                                  # lump 2 goes while the belt is staging
         rel = f.releases[0]
         self.assertEqual((rel['lumps'], rel['lumps_after_stop'], rel['lumps_in_staging']), ([0, 1, 2], [1, 2], [2]))
-        self.assertEqual(f.report()['counts']['in_staging'], 1)
+        self.assertEqual(w.report(f.report())['counts']['in_staging'], 1)
         f.start(2.)
         self.assertFalse(f.staged)                                    # the next release starts a new count
 
@@ -436,7 +440,7 @@ class TransferStops(unittest.TestCase):
     """TransferWatch's record of the feed belt's stops, on a synthetic belt (no lumps, no physics)."""
 
     def setUp(self):
-        self.f = Feeder(CFGV, DV, 0)
+        self.f = Feeder(CFGV, DV)
         self.w = TransferWatch(CFGV, DV, SimpleNamespace(ngeom=0), [])
         self.data = SimpleNamespace(ncon=0)
         self.f.start(0.)

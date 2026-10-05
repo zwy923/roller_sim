@@ -38,6 +38,7 @@ from ..physics.drives import Conveyors
 from ..physics.lumps import Lump, lane_discharging, stalled
 from ..physics.numerics import Diagnostics
 from ..sensing.suite import Sensors
+from ..verify.feeder import FeederWitness
 from ..verify.station import StationWitness, frame_contacts
 from ..verify.transfer import TransferWatch
 from .layouts import arrange, plan_scatter
@@ -123,8 +124,9 @@ def _run(cfg, save):
     layout = arrange(cfg, d, model, data, lumps, rng)     # a bench layout; scatter / flat: as placed
     transfer = TransferWatch(cfg, d, model, lumps)
     # the whole batch lies on the feed belt; the first release starts at once
-    feeder = Feeder(cfg, d, len(lumps))
+    feeder = Feeder(cfg, d)
     feeder.start(0.)
+    feed_witness = FeederWitness(feeder, len(lumps))           # which lumps went in which release
     dt = model.opt.timestep
     face = FaceRetract(cfg, FaceServo(cfg, d, model, data))
     diagnostics = Diagnostics(model, cfg)
@@ -150,7 +152,7 @@ def _run(cfg, save):
     def waiting(L):
         """Planned waiting, for the stall bookkeeping only: queued on the feed belt, or held (or taken) by the
         station."""
-        if feeder.waiting(L.k, L.state, L.last_pose[0]):
+        if feed_witness.waiting(L.k, L.state, L.last_pose[0]):
             return 'feeder'
         if witness.waiting(L.k, L.state, L.last_pose[0]):
             return 'station'
@@ -239,8 +241,7 @@ def _run(cfg, save):
         else:
             feeder.resume(t)
             feeder.observe(t, sensors.feed_view, sensors.beams['beam_feed'].blocked, face.at_home)
-            if feeder.vision:
-                feeder.audit(t, {L.k: L.last_pose[0] for L in lumps if L.state == 'on_belt'})
+            feed_witness.observe(t, {L.k: L.last_pose[0] for L in lumps if L.state == 'on_belt'})
             if feeder.miss_streak >= 2 and sensors.beams['beam_feed'].alarm is None:
                 sensors.beams['beam_feed'].alarm = dict(t_s=round(t, 3), beam='beam_feed', why='dead', stop=True,
                                                         note='two releases in a row went without the beam')
@@ -297,11 +298,11 @@ def _run(cfg, save):
             break
         if rec and rec.due(t):
             # with the feed belt the camera follows the released lumps, not the ones queued on it
-            went = feeder.lumps_went if feeder.vision else feeder.released
+            went = feed_witness.went
             live_k = [L.k for L in lumps if L.state not in d['end_states'] and L.k in went]
             rec.frame(data, [lumps[k].s_hist[-1][1] for k in (live_k or range(len(lumps)))],
                       overlay(cfg, t, sum(1 for L in lumps if L.pass_t is not None), len(lumps), together['s'],
-                              belts.main.f, face, feeder, station))
+                              belts.main.f, face, feeder, len(went), station))
     if rec:
         rec.close()
 
@@ -315,7 +316,7 @@ def _run(cfg, save):
     out['provenance'] = provenance(xml, sensing=cfg['sensing'])
     out['outcome']['numerical_screen_passed'] = out['numerics']['ok']
     out['outcome']['stop_model'] = 'run terminates on alarm; no post-alarm braking/coasting simulation'
-    out['feeder'] = feeder.report()
+    out['feeder'] = feed_witness.report(feeder.report())
     out['transfer'] = dict(transfer.report(feeder), layout=layout)
     out['station'] = witness.report(station.report())
     out['perception'] = sensors.report()
