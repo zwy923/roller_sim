@@ -1,6 +1,6 @@
 # 煤矸混合来料模型（2026-09-24）
 
-当前默认 `--material-model composition`，版本 `coal_gangue_dry_v1`。这是**组成与质量守恒的干态等效模型，未经现场标定**。只修改来料材料生成与输出；尺寸、形状族、设备、控制、摩擦均沿用当前模型。相同种子、相同 `gangue_fraction` 下，原有几何与初始布置随机序列保持不变。
+材料模型只有一种：组成模型，版本 `coal_gangue_dry_v1`（旧的二元抽样 `--material-model legacy_binary` 是对照选项，2026-10-05 删除）。这是**组成与质量守恒的干态等效模型，未经现场标定**。只修改来料材料生成与输出；尺寸、形状族、设备、控制、摩擦均沿用当前模型。相同种子、相同 `gangue_fraction` 下，原有几何与初始布置随机序列保持不变。
 
 ## 组成口径
 
@@ -47,8 +47,7 @@ m = ρ × V
 ```powershell
 python plough.py --no-video
 python plough.py --no-video --gangue-fraction 0 --middlings-fraction 1  # 全部为连生体类别
-python plough.py --no-video --material-model legacy_binary           # 旧二元抽样策略
 python checks/material_checks.py
 ```
 
-缺少 `material_model` 的旧配置按 `legacy_binary` 处理，以保留旧材料采样行为。新旧材料总体不同，历史卡堵率等结果不能直接合并；本次只检查生成、质量守恒及短时运行，不重跑或宣称设备性能。
+新旧材料总体不同，2026-09-24 之前（二元抽样）的历史卡堵率等结果不能与现在的直接合并；当时只检查了生成、质量守恒及短时运行，没有重跑或宣称设备性能。`make_blocks()` 仍保留旧抽样的两次随机数（抽了不用），所以同一种子的块形和布料与历次批量试验一致（`checks/material_checks.py` 钉住了这一点）。

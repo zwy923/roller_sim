@@ -1,7 +1,7 @@
 """Every check of the project, one after the other.
 
-    python checks/run_all.py            the quick ones: about 3 minutes
-    python checks/run_all.py --full     also the physics acceptance runs of station_checks.py: about 15 minutes more
+    python checks/run_all.py            the quick ones: one to three minutes
+    python checks/run_all.py --full     also the physics acceptance runs of station_checks.py: 10 to 15 minutes more
 
 Each script still runs on its own (python checks/NAME.py); this only saves remembering the list. timestep_checks.py
 is not here: it is a sensitivity screen with its own arguments and output folder, not a pass/fail check.

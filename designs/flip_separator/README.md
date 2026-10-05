@@ -4,7 +4,7 @@
 独立模型最初接在 1.20 m 宽的卸料带后面，所以默认板宽 **1.20 m**；线上的板跟随计量带是 0.70 m（卸料带随原主线在 2026-09-30 删除）。
 
 2026-09-24 起：
-- 几何代码（`Config`、`build`、`state`、`verify`、`material_clearance`）移到 `singulator/separator.py`，本目录的 `model.py` 只负责独立模型的渲染、交互窗口和输出文件。移动前后独立模型的输出逐字相同。
+- 几何代码（`Config`、`build`、`state`、`verify`、`material_clearance`）移到 `singulator/separator.py`（2026-10-05 起在 `singulator/machine/separator.py`），本目录的 `model.py` 只负责独立模型的渲染、交互窗口和输出文件。移动前后独立模型的输出逐字相同。
 - 线上（见 [designs/station/DESIGN.md](../station/DESIGN.md)）把同一套零件接在计量带（称重 + 测体积）后面：
   - 板宽跟随计量带改为 0.70 m，纵筋按原间距排成 7 根；
   - 入口高度仍是 1.45 m，入口在带头后 2 cm，筋条顶比带面低 2 cm；

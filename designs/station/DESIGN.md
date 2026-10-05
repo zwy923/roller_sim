@@ -1,12 +1,13 @@
 # 线：缓冲带 + 计量带 + 排料板
 
 状态：2026-09-30 起这就是唯一的一条线（默认参数，不再有 `--preset` / `--station`）；前半段给料带见 [../feeder/DESIGN.md](../feeder/DESIGN.md)。代码：
-- `singulator/station.py`：缓冲带、计量带、排料板的动作和控制，作废停住；
-- `singulator/perception.py`：控制器读到的传感器信号——相机的估计轮廓 / 速度 / 可信度、光电的去抖与诊断、体积扫描的判定；
-- `singulator/line.py`：把传感器、故障注入和验收场景接进仿真；作废件停住后从线上移走；
-- `singulator/devices.py`：光束和摄像头的实体（安装位置、外壳、支架、镜头视场）；
-- `singulator/separator.py`：排料板几何，与独立模型共用；
-- `singulator/feeder.py`：给料带的预送和按预测放料；视觉模式下按区域判定放料。
+- `singulator/control/station.py`：缓冲带、计量带、排料板的动作和控制，作废停住；`singulator/machine/station.py` 是这一段的几何；
+- `singulator/sensing/`：控制器读到的传感器信号——`vision.py` 相机的估计轮廓 / 速度 / 可信度，`beams.py` 光电的去抖与诊断，`volume.py` 体积扫描的判定，`weigher.py` 称重装置；`suite.py` 把它们和故障注入接进仿真；
+- `singulator/verify/station.py`：把每件料的判定和真值对照（`false_valid` 等核验项）；控制器本身不读真值；
+- `singulator/sim/scenarios.py`：验收场景；作废件停住后从线上移走；
+- `singulator/machine/sensors.py`：光束和摄像头的实体（安装位置、外壳、支架、镜头视场）；
+- `singulator/machine/separator.py`：排料板几何，与独立模型共用；
+- `singulator/control/feeder.py`：给料带的预送和按预测放料；相机视图下按区域判定放料。
 
 版本：
 - 第一版（2026-09-24 上午）：称重带 → 测体积带 → 排料板，来一块料上游整段就停。
@@ -141,7 +142,7 @@
 
 **给料带**：
 - 预送和按预测放料同第二版；
-- 单块按轮廓形心预送；默认 `--blob-lead front` 让料团按前缘预送和慢走，避免前面的料在预送阶段被推出；`centroid` 作对照；
+- 单块按轮廓形心预送；料团按前缘预送和慢走，避免前面的料在预送阶段被推出；
 - 相机看到料的轮廓形心过机头 5 cm 才算"放出"，该判断与料团预送用的前缘不同；
 - 机头附近对象看不清就不放、不预送；默认前缘规则下，机头上料团可用 `conf_seen`（是否看清）判断，不因暂时数不清团内块数而一直禁止释放，后续计量仍须确认单块；
 - 放料判定**按区域，不按跟踪编号**。机头处相贴的料翻落时会反复合并 / 分开（种子 4001 两秒内出现 90 个新编号），按编号判会把挂在机头上的料当成下一块；
@@ -277,7 +278,7 @@ python checks/feeder_regression_checks.py
 - 计量与分选：`--scan-s`、`--sort-density`；
 - 计量段可选控制：`--weigh-stop rear/centre`、`--buffer-approach full/slow`（默认 `rear` / `full`）；
 - 排料板：`--separator-swing-s`、`--separator-friction`、`--separator-wall`；
-- 放料：`--feeder-release`、`--blob-lead`；
+- 放料：`--feeder-release`、`--feeder-sensing`；
 - 给料机头：`--feeder-step`、`--feeder-head-d`、`--feeder-tail-d`、`--feeder-handover`；
 - 传感：`--sensing`、`--fault`、`--scenario`；
-- 布料：`--layout`（`scatter`、`rows`、`aligned`、`touching`、`flat`、`oblique`）。
+- 布料：`--layout`（`scatter`、`aligned`、`touching`、`flat`、`oblique`）。

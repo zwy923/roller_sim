@@ -56,8 +56,7 @@ class Sensors:
         oracle = cfg['sensing'] == 'oracle'
         rng = np.random.default_rng([cfg['seed'], 20260930])      # its own stream: layout and physics unchanged
         st, dev = d['station'], d['devices']
-        self.vision = Vision(dev['cameras'], rng, exits=lambda x, y: x > st['measure']['x1'] - .02,
-                                        oracle=oracle)
+        self.vision = Vision(dev['cameras'], rng, exits=lambda x, y: x > st['measure']['x1'] - .02, oracle=oracle)
         self.beams = {b['name']: Beam(b['name'], b['x'], b['z'], b['max_block_s'], oracle=oracle)
                       for b in dev['beams']}
         self.scanner = Scanner(dev['scanner']['heads'], dev['scanner']['zone'], rng, oracle=oracle,

@@ -32,9 +32,10 @@
 ```powershell
 python plough.py                                          # 一批 5 块，出视频
 python plough.py --seed 392 --duration 150 --no-video     # 指定种子、时限，不渲染
-python plough.py --layout aligned --seed 6001 --count 4   # 并齐布料（还有 touching、flat、oblique、rows）
+python plough.py --layout aligned --seed 6001 --count 4   # 并齐布料（还有 touching、flat、oblique）
 python plough.py --bench --layout touching --seed 5001    # 只看给料机头：料全落到主带上就结束
 python plough.py --scenario touching --seed 4004          # 验收：两块相贴一起上秤，必须停住
+python checks/run_all.py                                  # 全部自检，1–3 分钟；--full 再加物理验收（再约 10–15 分钟）
 python checks/plough_checks.py                            # 给料带、犁面、车道：几何、驱动、块体、撤离、放料控制（12 节）
 python checks/station_checks.py                           # 缓冲 / 计量 / 排料板：几何、传感器、称重、控制、物理验收（约 15 分钟）
 python checks/feeder_regression_checks.py                 # 放料判定（不跑物理）
@@ -42,8 +43,10 @@ python checks/geometry_regression_checks.py               # 带面支撑、设�
 python checks/physics_regression_checks.py                # 动力学、有限制动、接触和诊断
 python checks/material_checks.py                          # 煤矸组成、质量守恒
 python checks/flip_separator_checks.py                    # 排料板独立模型：连杆、行程、通道间隙
+python checks/architecture_checks.py                      # 包的分层：依赖方向、控制器不读真值、可调常量可被 --set 改到
 python checks/timestep_checks.py                          # 同来料三档步长；不等同于实物标定
 python designs/transfer_trial/sweep.py                    # 小试：机头几何 × 布料矩阵
+python plough.py --set control.station.APPROACH=.65       # 临时改一个模块常量（可重复；python -m singulator.tuning 列出全部）
 python experiments/s7/s7_jobs.py --seeds 7101-7160 --out runs/s7_jobs.json            # 基线批量：四种布料 × 种子
 python experiments/s6/s6_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10   # 多进程跑，中断后同一条命令续跑
 python experiments/s7/s7_analyze.py runs/s7 --list                                    # 逐块审计：独立测量成功率、失败原因
@@ -73,17 +76,17 @@ python experiments/s7/s7_analyze_checks.py                                      
 | **外挡边** | 止于 x 0.55，距犁面扫掠包络 10 mm | 留出犁面摆动窗口；撤离期间这段带边是敞开的 |
 
 驱动件：给料带、主带、侧带、缓冲带、计量带、犁面撤离执行器、排料板油缸；犁面竖辊不驱动。
-传感器：给料带相机、单列段相机、计量段相机、排料板相机，光电 S1–S4，三头体积扫描（`singulator/devices.py`），控制器只读它们给出的信号（`--sensing vision`，默认）。两处例外是 2026-10-05 的基线定的：给料带控制器读每块料的真实质心和轮廓（`--feeder-sensing oracle`，默认；S1 仍是它的停带信号），计量装置停稳后固定 1 s 出数（`--weigh-model fixed`，默认）。
+传感器：给料带相机、单列段相机、计量段相机、排料板相机，光电 S1–S4，三头体积扫描（实体在 `singulator/machine/sensors.py`，信号模型在 `singulator/sensing/`），控制器只读它们给出的信号（`--sensing vision`，默认）。两处例外是 2026-10-05 的基线定的：给料带控制器读每块料的真实质心和轮廓（`--feeder-sensing oracle`，默认；S1 仍是它的停带信号），计量装置停稳后固定 1 s 出数（`--weigh-model fixed`，默认）。
 
 2026-10-04 代码状态：
-- `--blob-lead front` 默认启用：相贴料团按前缘预送、慢走，避免用整团形心预送时把前一块提前推出机头；孤立单块仍按轮廓形心。`centroid` 保留作对照。
+- 相贴料团按前缘预送、慢走，避免用整团形心预送时把前一块提前推出机头；孤立单块仍按轮廓形心。（对照选项 `--blob-lead centroid` 已于 10-05 删除。）
 - 跟踪器合并时不再把短时未匹配的旧轨迹重复计为新料；料团分开后保留来源关系。
 - 测量有效、等待翻板期间继续检查邻料和多块；有新料靠近会撤销放行、作废停住。
 - `--weigh-stop centre`（居中停）和 `--buffer-approach slow`（接缝前最后 0.45 m 按计量带速度运行）已经实现，**默认仍是 `rear` / `full`**。称重判稳时限默认仍为 3 s；S6 的 `robust` 等实验组合不是默认配置。
 
 2026-10-05 基线（用户定的三项，默认值随之改了；上面 10-04 的几条仍然成立）：
 - **出口 0.60 m**（`--lane-w`，此前 0.65）：折弯和主带机头顺流后移 7 cm，犁面多一根竖辊；单列段相机的高度和门架立柱改成随出口宽度算（0.60 m 时相机高 2.50 m）。
-- **给料读质心**（`--feeder-sensing oracle`）：给料带控制器不经过相机，直接读每块料的真实质心和轮廓；没有"料团"，慢走和放出都按质心判。相机控制给料（上面的 `--blob-lead` 等）留在 `--feeder-sensing vision`。计量段、犁面仍读模拟相机和光电；`--sensing oracle` 是整条线都读真值的对照。
+- **给料读质心**（`--feeder-sensing oracle`）：给料带控制器不经过相机，直接读每块料的真实质心和轮廓；没有"料团"，慢走和放出都按质心判。相机控制给料（料团按前缘预送等）留在 `--feeder-sensing vision`。计量段、犁面仍读模拟相机和光电；`--sensing oracle` 是整条线都读真值的对照。
 - **计量固定 1 s**（`--weigh-model fixed`）：计量带停稳后 1 s 出数，取最后 0.5 s 的平均；读数稳不稳只记录（`steady`），不作废。原来"3 s 内读数稳定才出数、否则作废"的规则留在 `--weigh-model steady`。
 - 同日修了读质心路径上 S1 失效的误报（见文末「2026-10-04、10-05 修复」）。
 - 第 S6 节的批次是 10-04 的线。用现在的代码复现要带 `--lane-w .65 --feeder-sensing vision --weigh-model steady`（`experiments/s6/s6_jobs.py` 已自动加）。
@@ -113,7 +116,6 @@ python experiments/s7/s7_analyze_checks.py                                      
 
 **布料** `--layout`：
 - `scatter`（默认）：单层、任意分布，在 `--feed-len` 料区内随机抽 x / y / 偏角，只要求俯视凸包不重叠（允许贴着）；
-- `rows`：成行摆放（规整输入，只作对照）；
 - `aligned`（并齐）、`touching`（相贴）、`flat`（扁平）、`oblique`（斜放）：给料机头小试的布料，见 [designs/transfer_trial/DESIGN.md](designs/transfer_trial/DESIGN.md)。
 
 ## 结局判据
@@ -139,7 +141,7 @@ python experiments/s7/s7_analyze_checks.py                                      
 - **撤离够不着折弯口和车道**：铰点在折弯处，铰点附近几乎不动，车道外壁不动；折弯口和车道里的拱撤离解不开。
 - **保持超时从退到位起计时**，不看料是否恢复了前进。
 - **撤离期间外侧带边敞开**：外挡边止于 x 0.55，犁面退开时料可能从那里掉下（`dropped`）。
-- **犁面是有限力矩动力学执行器**：托架质量、伺服刚度阻尼是假设。`--face-drive-model kinematic` 仅作建模诊断对照。
+- **犁面是有限力矩动力学执行器**：托架质量、伺服刚度阻尼是假设。
 - **驱动无电流、发热和跳闸模型**；侧带 15 kN 限力是假设。
 - **接触参数尚未证明收敛**：默认 dt 0.25 ms、solref 2 ms；三档步长对照里部分工况清空时间仍敏感。
 - **料不可破碎，恢复系数未标定**；密度、摩擦、块形均是假设。
@@ -151,35 +153,41 @@ python experiments/s7/s7_analyze_checks.py                                      
 
 ## 代码结构
 
+2026-10-05 起 `singulator/` 按依赖方向分层：**下面的层只引用上面的层**，信息单向流动——真值 → 传感器 → 控制器 → 驱动目标。分层说明、每 10 ms 采样内的先后顺序、怎样替换称重 / 体积装置，见 [ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
 ```
 README.md              总入口：当前结构、运行方法、目录导航
 requirements.txt       Python 依赖；本地环境在 .venv/
 docs/                  项目说明与实验结论
+  ARCHITECTURE.md      代码分层、数据流、替换计量装置的方法、2026-10-05 删掉的选项
   EXPERIMENTS.md       当前实验结论、明细导航和常用命令
-  history/            S1–S5 历史实验记录
+  history/             S1–S5 历史实验记录
   TODO.md              有意推后的问题（2026-10-05 起）
   MATERIAL_MODEL.md    材料与密度模型
   REALISM_REVIEW.md    现实性核查及边界
 plough.py              命令行入口：解析参数 → simulate.run() → 打印摘要
 singulator/            模型包
-  config.py            命令行参数（每个默认值就是这条线）
-  lumps.py             形状族、密度 / 组成抽样、来料布置、块体轮廓的世界坐标与截线
-  machine.py           尺寸常数与派生几何：给料带、犁面、车道、主带、侧带、计量段、犁面扫掠与摆动窗口
-  assembly.py          生成 MuJoCo 模型；活动件全行程间隙扫描 motion_clearance
-  devices.py           传感器实体：光束、摄像头、体积扫描的安装、外壳、视场与覆盖检查
-  drives.py            虚拟电机、输送驱动（给料带、主带、侧带、缓冲带、计量带）、载荷统计
-  face.py              撤离控制：犁面状态机、复位许可、复位故障、载荷与接触记录
-  feeder.py            给料带：几何、落料光束与逐块放料控制
-  station.py           缓冲带、计量带的几何与控制，排料板的动作，称重读数，作废停住
-  separator.py         排料板几何（MJCF、连杆状态、检查），独立模型和线上共用
-  perception.py        控制器读到的传感器信号：相机跟踪、光电去抖与诊断、体积扫描判定
-  line.py              传感器接进仿真、作废件移出、故障注入、验收场景、视觉判卡
-  trial.py             布料（并齐 / 相贴 / 扁平 / 斜放）与给料机头交接记录
-  tracking.py          逐块观测（前缘 / 质心 / 尾缘 / 接触）、停滞规则
+  config.py            全部参数的唯一来源：PARAMS 表 → 命令行、default_config()、validate()
+  tuning.py            --set MODULE.NAME=VALUE：一次运行内临时改模块常量，并记入 result.json
+  lumps.py             形状族、组成 / 密度抽样、质量
+  geom2d.py  series.py 平面几何（凸包、重叠、间距）；载荷序列统计
   audit.py             共用逐块审计：独立测量成功率、失败原因、批次状态和后续检查
-  video.py             跟随视角 + 俯视，字幕
-  simulate.py          run()：编译、步进、每 10 ms 观测与判卡、写 result.json / model.xml / trajectory.npz
-checks/                自检（见「运行」）
+  simulate.py          run(cfg)：建线 → 循环 → 出结果
+  machine/             设备本体：纯几何 + MJCF，不动、不判断
+    feed_belt.py  plough.py  station.py  separator.py  sensors.py   各段自己的尺寸与零件
+    layout.py          derive(cfg)：各段依次摆放，得到全包共用的几何字典 d
+    assembly.py        build_xml()：按固定顺序拼装模型；接触类别；活动件全行程间隙扫描
+  physics/             被仿真的对象：drives.py 各条带的虚拟电机，actuators.py 犁面伺服与排料板，
+                       lumps.py 料块真值（每 10 ms），numerics.py 数值筛查
+  sensing/             控制器能知道的：vision.py 相机，beams.py 光电，volume.py 体积扫描，
+                       weigher.py 称重（LoadCell + Weigher 接口），suite.py 汇总与故障注入
+  control/             控制器，只读传感器信号：feeder.py 给料带，face.py 犁面撤离，station.py 缓冲 /
+                       计量 / 排料板，supervisor.py 线级规则（联锁、判卡、停线）
+  verify/              与真值对照，不回馈控制：station.py（false_valid 等核验项），feeder.py（每次放料
+                       真正过边的料），transfer.py（机头交接记录）
+  sim/                 一批料的运行：layouts.py 布料，scenarios.py 验收场景与作废件移出，line.py 整条线
+                       的组装与每步 / 每采样的顺序，record.py 真值记录与轨迹，results.py 结果组装，video.py
+checks/                自检（见「运行」）；run_all.py 一次跑完
 designs/
   feeder/              给料带的设计说明
   station/             缓冲带、计量带、排料板与流程逻辑
@@ -188,12 +196,12 @@ designs/
   step_lifter_concept/ SF-01 抬料器方案草图（draw_concept.py）
 experiments/
   README.md            当前 S7 / 历史 S6 的入口与存放规则
-  s6/                  第 S6 节的批量试验：s6_jobs.py（清单）、s6_run.py（多进程、可续跑）、s6_analyze.py（汇总）、
-                       s6_pairs.py（一起放下的两块料后来怎样）；结果和代码快照见该目录的 README.md
+  s6/                  第 S6 节的批量试验：s6_jobs.py（清单）、s6_run.py（多进程、可续跑，S7 共用；新旧代码
+                       快照都能跑）、s6_analyze.py（汇总）、s6_pairs.py（一起放下的两块料后来怎样）
   s7/                  第 S7 节，基线的批量验证：s7_jobs.py（清单）、s7_analyze.py（共用审计的批量报告）、s7_analyze_checks.py（审计自检）
   每节下的 jobs/       已保存的任务清单；root 相对清单定位到 ../snapshots/
            results/    原始摘要和压缩完整结果，保留 out* 组名
-           snapshots/  当时的源码副本，保留 candidate* 版本名
+           snapshots/  当时的源码副本，保留 candidate* 版本名（都是重构前的平铺结构）
            archive/    历史差异、日志、草稿、临时试跑与备份
            REPORT.md   该阶段的完整实验过程、结果表格与复现记录
 runs/                  新运行产物；旧演示和试跑在 archive/，见本目录 README.md
@@ -206,6 +214,14 @@ archive/               文件整理记录、修改前备份和校验清单
 
 物性是未标定且无已核验手册来源的假设；形状是合成凸包（无凹面、不破碎、无水分粘附）；接触为软约束；驱动限力与反射质量是筛查假设。称重是接触力之和、体积是理想值，传感器信号（相机、光电、扫描是否可用）是占位参数的模型，没有用真实煤矸标定。结果只能用于明确物性、控制、数值敏感性边界下的机制筛查，不能当实物发生率、产率或选型依据。模型核查记录见 [REALISM_REVIEW.md](docs/REALISM_REVIEW.md)。
 
+## 2026-10-05 结构重构
+
+只动代码结构，不改机器和控制规则：同一环境下重构前后逐位比对（`result.json` 与轨迹），结果见 [ARCHITECTURE.md](docs/ARCHITECTURE.md) 末尾。用的时候要知道的三件事：
+
+- **删掉的选项**（都是对照用的旧实现）：`--face-drive-model kinematic`、`--no-drive-limit`、`--face-shape straight` / `--skew-deg`、`--face-hinge upstream`、`--no-unjam`（改用 `--unjam-max 0`）、`--feed-band plough`、`--layout rows`、`--material-model legacy_binary`、`--blob-lead centroid`。带这些参数的旧命令会报"无此参数"；要复现当时的结果，用 `experiments/*/snapshots/` 里的源码快照。
+- **改模块常量**不再在任务文件里写 `singulator.station.X`，改用 `--set control.station.X=值`（任务文件的 `"set"` 同理）；`python -m singulator.tuning` 列出全部可改的常量及其所在模块。
+- **换称重 / 体积装置**：`sensing/weigher.py` 的 `Weigher`、`sensing/volume.py` 的 `Scanner` 是工位控制器用到的全部接口，换实现不用动控制器。
+
 ## 2026-10-04、10-05 修复
 
 前三条是读代码、跑种子 392 时发现的，中间五条是第 S6 节的试验和它的准备工作里查出来的，最后一条是第 S7 节验证时查出来的；每条都有自检（`checks/feeder_regression_checks.py`，`checks/station_checks.py` 的 `Tracker` 和 `Control`）。
@@ -215,11 +231,11 @@ archive/               文件整理记录、修改前备份和校验清单
 | 光束挡着时又起放料（相机路径） | 料翻过机头时先挡住 S1，轮廓形心还没过机头 5 cm，相机仍把它算作排队的头一块：停带后马上又起一次放料，下一帧又被光束停住，反复空放（种子 392：0.07 s 内 4 次） | S1 挡着时不起放料。读质心的路径没有这一条，见 [TODO.md](docs/TODO.md) 第 1 节 |
 | 放料报告（相机路径） | 控制器没有每块料的身份，`never_released` 把每块都列成没放出，`after_stop` 恒为 0 | 取核验记录：哪几块放出，哪几块是停带后才下去的 |
 | 停带距离记录 | 给料带没停稳就被预送或下一次放料重新起动时，记录一直开着，把后面整段运行都算成停带行程（种子 392：0.756 m、8.16 s） | 没停稳就再起动的停带单列（`stops_interrupted`），不进最大值 |
-| 预送把贴着的料带过机头（相机路径） | 贴在一起的料在相机里是一团。给料带按这一团的轮廓形心预送和慢走，而前面那块自己的形心比它靠前 0.2–0.5 m：预送途中前面那块已经翻下去，这次下料没有经过放料判定 | 一团料按前缘预送和慢走（`--blob-lead front`，默认；`centroid` 是原来的做法，留作对照）；一团料只是块数拿不准时不再暂停放料 |
-| 跟踪记数 | 一团料散开后留下的旧轨迹（已不对应任何对象）在下一次合并时又把块数加一遍。一块料挨着别的料躺在给料带上，19 s 内被记成 13 块（随机 7001），到计量带判"多块"作废 | 这种轨迹合并时不加块数（`perception.GHOST_S`） |
-| 跟踪血缘 | 两块前后相贴的一团分开时，这一团的轮廓形心在两块中间，离两块各自的形心都超过 0.20 m 的匹配门限，两块都成了没有来历的新对象；计量段发现原来的对象没了、原地多出一个不认识的，判"跟踪丢失"作废（相贴 7004） | 出现在刚失配轨迹的轮廓里的新对象继承它的血缘（`perception.SPLIT_PAD`） |
+| 预送把贴着的料带过机头（相机路径） | 贴在一起的料在相机里是一团。给料带按这一团的轮廓形心预送和慢走，而前面那块自己的形心比它靠前 0.2–0.5 m：预送途中前面那块已经翻下去，这次下料没有经过放料判定 | 一团料按前缘预送和慢走（原来的做法曾留作对照选项 `--blob-lead centroid`，10-05 删除）；一团料只是块数拿不准时不再暂停放料 |
+| 跟踪记数 | 一团料散开后留下的旧轨迹（已不对应任何对象）在下一次合并时又把块数加一遍。一块料挨着别的料躺在给料带上，19 s 内被记成 13 块（随机 7001），到计量带判"多块"作废 | 这种轨迹合并时不加块数（`sensing.vision.GHOST_S`） |
+| 跟踪血缘 | 两块前后相贴的一团分开时，这一团的轮廓形心在两块中间，离两块各自的形心都超过 0.20 m 的匹配门限，两块都成了没有来历的新对象；计量段发现原来的对象没了、原地多出一个不认识的，判"跟踪丢失"作废（相贴 7004） | 出现在刚失配轨迹的轮廓里的新对象继承它的血缘（`sensing.vision.SPLIT_PAD`） |
 | 判好的件等排料板时没人看 | 密度算出之后、排料板到位之前（最长约 2 s），计量带上的料不再做隔离检查。停在 S3 的圆料滚过接缝贴上它，两块一起排出，后一块没测就落了仓（滚筒机头试验，并齐 7011） | 等排料板期间照旧检查"5 cm 内有别的对象、不止一个对象"，出现就作废停住 |
-| 凸包计算 | scipy 的 ConvexHull 在 Windows 上每次调用都开一个临时文件；每仿真秒约 600 次，占一次运行的大部分时间，并行进程互相等 | 纯 Python 单调链（`perception.hull2`），2800 组点逐点相同，批结果相同 |
+| 凸包计算 | scipy 的 ConvexHull 在 Windows 上每次调用都开一个临时文件；每仿真秒约 600 次，占一次运行的大部分时间，并行进程互相等 | 纯 Python 单调链（`geom2d.hull2`），2800 组点逐点相同，批结果相同 |
 | S1 失效的误报（读质心的路径，10-05） | 放出的料 1 s 内没挡住 S1 就记一次漏检，连着两次判"光束失效"停线。给料读质心之后，计时从质心过机头边缘就开始，约十二分之一的放料翻得比 1 s 慢——光束随后都看到了。首轮验证 118 批里 6 批因此停线，16 块料没到秤上（第 S7 节） | 和相机路径一样：这次放料的料整块越过了光束、而光束从这次放料起一直没挡过，才算一次；连着两次才判失效。1 s 的兜底停带不变 |
 
 ## 2026-09-22 修复
@@ -228,7 +244,7 @@ archive/               文件整理记录、修改前备份和校验清单
 
 | 项 | 修复前 | 修复后 |
 |---|---|---|
-| 块体轮廓 | 编译后网格顶点按 body 位姿变换（seed 81 最大偏 0.18 m） | 按 geom 位姿变换（`block_world_vertices`），与生成几何一致到 1e-8 m |
+| 块体轮廓 | 编译后网格顶点按 body 位姿变换（seed 81 最大偏 0.18 m） | 按 geom 位姿变换（`physics.lumps.world_vertices`），与生成几何一致到 1e-8 m |
 | 设备干涉 | 外挡边贯穿摆动犁面（静止时首根竖辊插入 35 mm，摆动中最深 52 mm） | 外挡边止于犁面扫掠包络前 10 mm；`motion_clearance` 全行程扫掠检查 |
 | 撤离超时 | 20 s 后带料强收 | 保持退让、停机，记 `jammed` / `retract_hold_timeout` |
 | 复位许可 | 区段判空时有豁免 | 区段判空不豁免，另加整块轮廓对回位扫掠区的检查，复位中持续检查 |

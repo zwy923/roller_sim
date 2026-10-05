@@ -1,6 +1,6 @@
 # 给料带：下台阶逐块放料
 
-线的第一段，代码在 `singulator/feeder.py`。
+线的第一段。代码：几何与模型在 `singulator/machine/feed_belt.py`，放料控制在 `singulator/control/feeder.py`（一套状态机 + 两种读取方式：理想视图 `_Ideal`、相机视图 `_Camera`），每次放料真正过边的料块记录在 `singulator/verify/feeder.py`。
 
     给料带（整批 3–5 块单层暂存，顶面比主带高 10 cm）→ 机头边缘 → 主带（直带）0.80 m → 犁面 → 车道 0.60 m
 
@@ -11,7 +11,7 @@
   - 控制器读相机的估计轮廓和去抖后的光束，放料按区域判，不按跟踪编号（`_observe_vision`）；
   - 机头可以建真实滚筒、下游尾辊和交接间距；
   - 台阶从 5 cm 改为 **10 cm**（用户）。
-- 2026-10-04：默认 `--blob-lead front`，相贴料团按前缘预送和慢走，避免用整团形心预送时把前面的料提前推出去；`centroid` 可作旧规则对照。单块仍用轮廓形心。
+- 2026-10-04：相贴料团按前缘预送和慢走，避免用整团形心预送时把前面的料提前推出去；单块仍用轮廓形心。（当时留了 `--blob-lead centroid` 作旧规则对照，2026-10-05 删除。）
 - 2026-10-05（用户：给料直接读质心，相机控制给料暂不需要）：
   - 给料带控制器默认读每块料的**真实质心和轮廓**（`--feeder-sensing oracle`），不经过相机。慢走区按质心离机头边缘 5 cm 判，质心一过边缘就算放出；没有料团，也就没有"按前缘预送"。
   - 下文「放料动作」里凡是说"相机""轮廓形心""料团"的规则，都是 `--feeder-sensing vision` 那条路径，保留作选项；相机控制给料还要回答什么，记在 [TODO.md](../../docs/TODO.md) 第 3 节。
@@ -55,9 +55,9 @@
 
 - `feeder.geometry()`：给料带位置、台阶、光束位置和机头几何，并做校验：必须比主带慢；慢走不快于前送；台阶为正；间距要够一块料加停车距离；交接间距不小于两辊能容下的最小值。
 - `feeder.Feeder`：放料状态机（`feeding` / `stopped` / `empty`），设定给料带驱动的目标速度系数（1 = 前送，0.3 = 慢走）。
-- `assembly.build_xml()`：给料带平板抬高一个台阶，可选滚筒和尾辊；`lumps._shift_to_start()`：布料整体挪到给料带上并抬高一个台阶。
+- `machine/feed_belt.py` 的 `bodies()`（由 `machine/assembly.py` 拼装）：给料带平板抬高一个台阶，可选滚筒和尾辊；`sim/layouts.py` 的 `_shift_to_start()`：布料整体挪到给料带上并抬高一个台阶。
 - 停滞统计：还在给料带上排队的料记在各块的 `feeder_wait_s`，不算停滞。
-- 输出：`result.json` 的 `feeder`（每次放料、停带原因、点动）和 `transfer`（机头交接记录，见 `singulator/trial.py`）；`drives.feeder`；视频字幕一行给料带状态。
+- 输出：`result.json` 的 `feeder`（每次放料、停带原因、点动）和 `transfer`（机头交接记录，见 `singulator/verify/transfer.py`）；`drives.feeder`；视频字幕一行给料带状态。
 
 ## 自检
 
@@ -81,4 +81,4 @@ python checks/plough_checks.py
 python checks/feeder_regression_checks.py
 ```
 
-可调参数：`--feeder-step`、`--feeder-speed`、`--feeder-creep-speed`、`--feeder-len`、`--feeder-gap`、`--feeder-ramp-s`、`--feeder-stall-s`、`--feeder-force-max`、`--feeder-release`、`--blob-lead`、`--feeder-head-d`、`--feeder-tail-d`、`--feeder-handover`。
+可调参数：`--feeder-step`、`--feeder-speed`、`--feeder-creep-speed`、`--feeder-len`、`--feeder-gap`、`--feeder-ramp-s`、`--feeder-stall-s`、`--feeder-force-max`、`--feeder-release`、`--feeder-sensing`、`--feeder-head-d`、`--feeder-tail-d`、`--feeder-handover`。

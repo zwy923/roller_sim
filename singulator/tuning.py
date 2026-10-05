@@ -15,10 +15,12 @@ a tuple of numbers, and the value must be of the same kind.
 For an override to reach every use, code reads another module's tunable as module.NAME at the point of use; it
 does not import the name or derive a constant from it at import time (checks/architecture_checks.py).
 """
+import ast
 import importlib
+import inspect
 from contextlib import contextmanager
 
-PACKAGE = __name__.rsplit('.', 1)[0]
+PACKAGE = __package__ or 'singulator'
 
 
 def _number(v):
@@ -27,6 +29,17 @@ def _number(v):
 
 def _tunable(v):
     return v is None or _number(v) or (isinstance(v, tuple) and len(v) > 0 and all(_number(x) for x in v))
+
+
+def _own(module):
+    """The tunables a module defines itself: upper-case names assigned at its top level (not the ones it imports:
+    setting a copy would change one user of the constant and not the others). config has parameters, no tunables."""
+    if module.__name__ == PACKAGE + '.config':
+        return {}
+    tree = ast.parse(inspect.getsource(module))
+    names = {t.id for node in tree.body if isinstance(node, ast.Assign) for t in node.targets
+             if isinstance(t, ast.Name)}
+    return {n: getattr(module, n) for n in sorted(names) if n.isupper() and _tunable(getattr(module, n))}
 
 
 def resolve(name):
@@ -38,7 +51,7 @@ def resolve(name):
         module = importlib.import_module('%s.%s' % (PACKAGE, mod))
     except ImportError:
         raise ValueError('--set %s: no module %s.%s' % (name, PACKAGE, mod))
-    if not hasattr(module, attr) or not _tunable(getattr(module, attr)):
+    if attr not in _own(module):
         raise ValueError('--set %s: %s.%s has no tunable %s' % (name, PACKAGE, mod, attr))
     return module, attr
 
@@ -90,10 +103,8 @@ def listing():
     out = {}
     package = importlib.import_module(PACKAGE)
     for info in pkgutil.walk_packages(package.__path__, PACKAGE + '.'):
-        module = importlib.import_module(info.name)
-        for attr, value in vars(module).items():
-            if attr.isupper() and not attr.startswith('_') and _tunable(value) \
-                    and getattr(module, '__name__', '') == info.name:
+        if not info.ispkg:
+            for attr, value in _own(importlib.import_module(info.name)).items():
                 out['%s.%s' % (info.name[len(PACKAGE) + 1:], attr)] = value
     return out
 
