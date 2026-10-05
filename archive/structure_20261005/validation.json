@@ -1,0 +1,26 @@
+{
+  "existing_files_preserved": 7944,
+  "byte_identical_files": 7917,
+  "job_lists": 14,
+  "tasks_with_parameters_preserved": 3729,
+  "active_markdown_files": 13,
+  "local_links_checked": 55,
+  "snapshot_hashes": {
+    "experiments/s6/snapshots/candidate": "142d60ca48ccb88d53982f52822abac895e6f10c70ff65a2290946e57f751df2",
+    "experiments/s6/snapshots/candidate2": "f44ce8a554b297f7899808b82b60aef54daa253bc0585334bfe49e9cd597d1d5",
+    "experiments/s6/snapshots/candidate3": "664de0caba4470d939bf12fdbbf95226db81dd6c40262bf877ec66091a74fed6",
+    "experiments/s7/snapshots/candidate": "f6794775751647f6de1936d26536fa94b62feab6879a0387db3862d3ae14e622"
+  },
+  "s7": {
+    "tasks": 240,
+    "results": 237,
+    "no_result": 3,
+    "input": 949,
+    "measured": 932
+  },
+  "status": "passed",
+  "edited_existing_files": 27,
+  "extra_repair": "S7 CLI missing BAD_END import; added full CLI regression",
+  "entry_checks_passed": 9,
+  "audit_tests_passed": 17
+}

@@ -1,0 +1,11 @@
+[
+  "plough.py --help",
+  "experiments/s6/s6_run.py --help",
+  "experiments/s7/s7_analyze_checks.py",
+  "experiments/s7/s7_analyze.py experiments/s7/results/out_valid_b experiments/s7/results/out_valid_c --list",
+  "experiments/s6/s6_analyze.py experiments/s6/results/out --only base,final --base base",
+  "experiments\\s6\\snapshots\\candidate\\plough.py --help",
+  "experiments\\s6\\snapshots\\candidate2\\plough.py --help",
+  "experiments\\s6\\snapshots\\candidate3\\plough.py --help",
+  "experiments\\s7\\snapshots\\candidate\\plough.py --help"
+]

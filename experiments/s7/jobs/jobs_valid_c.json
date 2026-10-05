@@ -1,0 +1,1922 @@
+[
+{
+"config": "baseline",
+"tag": "scatter_7131",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7131",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7131",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7131",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7131",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7131",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7131",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7131",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7132",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7132",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7132",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7132",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7132",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7132",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7132",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7132",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7133",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7133",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7133",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7133",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7133",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7133",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7133",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7133",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7134",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7134",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7134",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7134",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7134",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7134",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7134",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7134",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7135",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7135",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7135",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7135",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7135",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7135",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7135",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7135",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7136",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7136",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7136",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7136",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7136",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7136",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7136",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7136",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7137",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7137",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7137",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7137",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7137",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7137",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7137",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7137",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7138",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7138",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7138",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7138",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7138",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7138",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7138",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7138",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7139",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7139",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7139",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7139",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7139",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7139",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7139",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7139",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7140",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7140",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7140",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7140",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7140",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7140",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7140",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7140",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7141",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7141",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7141",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7141",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7141",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7141",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7141",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7141",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7142",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7142",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7142",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7142",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7142",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7142",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7142",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7142",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7143",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7143",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7143",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7143",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7143",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7143",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7143",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7143",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7144",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7144",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7144",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7144",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7144",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7144",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7144",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7144",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7145",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7145",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7145",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7145",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7145",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7145",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7145",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7145",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7146",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7146",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7146",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7146",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7146",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7146",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7146",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7146",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7147",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7147",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7147",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7147",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7147",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7147",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7147",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7147",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7148",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7148",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7148",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7148",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7148",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7148",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7148",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7148",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7149",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7149",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7149",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7149",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7149",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7149",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7149",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7149",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7150",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7150",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7150",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7150",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7150",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7150",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7150",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7150",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7151",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7151",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7151",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7151",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7151",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7151",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7151",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7151",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7152",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7152",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7152",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7152",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7152",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7152",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7152",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7152",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7153",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7153",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7153",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7153",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7153",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7153",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7153",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7153",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7154",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7154",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7154",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7154",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7154",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7154",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7154",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7154",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7155",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7155",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7155",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7155",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7155",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7155",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7155",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7155",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7156",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7156",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7156",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7156",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7156",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7156",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7156",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7156",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7157",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7157",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7157",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7157",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7157",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7157",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7157",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7157",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7158",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7158",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7158",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7158",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7158",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7158",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7158",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7158",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7159",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7159",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7159",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7159",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7159",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7159",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7159",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7159",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "scatter_7160",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7160",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "aligned_7160",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7160",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "touching_7160",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7160",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+},
+{
+"config": "baseline",
+"tag": "oblique_7160",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7160",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate"
+}
+]

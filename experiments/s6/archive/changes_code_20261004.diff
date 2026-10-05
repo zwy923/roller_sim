@@ -1,0 +1,1009 @@
+--- a/singulator/feeder.py (2026-10-04 之前)
++++ b/singulator/feeder.py (10-04 交付)
+@@ -64,13 +64,20 @@
+ centre of mass) and the debounced beam, and judges by region instead of by track id -- see _observe_vision.
+ --sensing oracle gives it one object per lump with the true centroid and hull (observe).
+ 
++A blob -- lumps lying against each other, one object to the cameras -- is led by its FRONT EDGE, not by its outline
++centroid (--blob-lead front, the default since 2026-10-04; see _lead_x). The lump in front of a blob has its centroid
++0.2-0.5 m ahead of the blob's. Staging the blob's centroid at the creep zone therefore ran the lump in front over
++the edge at full feed speed while no release was on: nothing had judged whether the funnel was clear for it, and it
++was booked to the release before (EXPERIMENTS.md S6). Led by the front edge a blob is staged with its front at the
++edge and crept from there until the beam is cut.
++
+ Nothing here is calibrated. Both belts are plates with a prescribed surface velocity.
+ """
+ import math
+ 
+ import numpy as np
+ 
+-from .perception import CONF_OK
++from .perception import CONF_OK, SOLID_SURE
+ 
+ DEFAULTS = dict(feeder_speed=.10, feeder_creep_speed=.03, feeder_step=.10, feeder_len=2.2, feeder_gap=.80,
+                 feeder_ramp_s=.30, feeder_stall_s=.50, feeder_force_max=3000.)
+@@ -98,6 +105,11 @@
+ JUST_WENT = .25      # m: ... and has only just gone while it is less than this past it
+ JOG_MAX_S = 3.       # s: vision: a hang jog runs at most this long without the beam being cut
+ STAGE_REACH = .80    # m: vision: objects from this far behind the edge to the lane entry must be recognised
++NOSE_SHARE = 1 / 3   # vision: the lump in front of a blob has its centroid at least this share of size_min behind the
++                     # blob's front edge (a convex outline's centroid lies at least a third of its width from every
++                     # side; 3000 generated lumps at any heading: 0.085 m at the least, 0.12 m for 999 in 1000)
++BLOB_FRAMES = 2      # vision: an outline that is not one convex lump this many frames running is a blob ...
++UNBLOB_FRAMES = 20   # ... until it has looked like one lump for this many
+ 
+ 
+ def geometry(cfg, first_x):
+@@ -172,6 +184,10 @@
+         self.lumps_went = set()                         # vision: true lumps over the edge (verification)
+         self.miss_streak = 0                            # releases in a row that ended on the beam-miss fallback
+         self.across_hist = []                           # vision: (t, centroid x of the most advanced object across the edge)
++        self.blob_lead = cfg.get('blob_lead', 'front')  # vision: a blob is led by its front edge (see _lead_x)
++        self.nose_min = NOSE_SHARE * cfg.get('size_min', .30)
++        self.blobs, self.blob_run = set(), {}           # vision: track ids that may hold several lumps (_mark_blobs)
++        self.staged = False                             # the belt was run for staging since the last release stopped
+         self.hang, self.jog_t0 = False, 0.              # vision: a release ended on the beam-miss fallback
+         # a lump that went has to cross the hand-over gap before it reaches the beam (dragged at about half the
+         # main belt speed while its rear still rests on the head drum): the fallback waits that much longer
+@@ -189,6 +205,7 @@
+         self.releases.append(dict(release=len(self.releases), members=[], after_stop=[], t_start_s=round(t, 3),
+                                   t_creep_s=None, t_stop_s=None, stop='', jogs=0))
+         self.phase, self.goal, self.jog, self.miss_shift = 'feeding', 1., None, 0.
++        self.staged = False
+         self.events.append(dict(t_s=round(t, 3), event='release_start', release=len(self.releases) - 1))
+ 
+     # ---- station hold ----------------------------------------------------------------------------
+@@ -313,6 +330,9 @@
+         in 2 s), and a controller keyed on ids takes the lump hanging on the edge for the next one to go. So:
+           gone      an object whose outline centroid is WENT_MARGIN past the edge (the camera's centroid error);
+           queued    every other object: still on the feed belt, possibly overhanging;
++          lead      how far forward the next lump to go can be: an object's outline centroid, or for a blob the
++                    point nose_min behind its front edge (_lead_x). Creep, staging and the predicted arrival at
++                    the funnel all go by it;
+           just gone a gone object within JUST_WENT of the edge: a release has put something over (starts the
+                     beam-miss clock);
+           across    a gone object still across the edge: jogged if the most advanced one has not moved 2 %% of
+@@ -321,6 +341,11 @@
+                     short of the lane entry has a speed from its track and is predicted out in time (as 5'),
+                     none lies across the beam; and in both, every object from STAGE_REACH behind the edge to the
+                     lane entry is seen with confidence -- an object it cannot vouch for holds the release;
++                    and in both, the drop beam is clear. A lump tipping over the edge cuts the beam before its
++                    outline centroid is WENT_MARGIN past it: to the cameras it is still queued, and the lead. Without
++                    the beam a release started on it at once and the same beam stopped it one sample later, again and
++                    again, the feed belt kept near creep speed meanwhile (seed 392: four empty releases in 0.07 s;
++                    2026-10-04);
+           hang      a release that ended on the beam-miss fallback left a lump hanging on the edge (it went but
+                     did not drop far enough to cut the beam). The camera may not tell it from the next lump
+                     touching it (one blob). So no release until the beam has seen it: jog at creep until the
+@@ -328,6 +353,7 @@
+           dead beam the camera sees an object pass wholly beyond the beam after a release that never cut it;
+                     twice in a row: the beam is dead (simulate raises the alarm)."""
+         W, x1, m, bx = self.cfg['feeder_stall_s'], self.g['x1'], WENT_MARGIN, self.g['beam']['x']
++        self._mark_blobs(view)
+         gone = [o for o in view.values() if o['cx'] > x1 + m]
+         q = [o for o in view.values() if o['cx'] <= x1 + m]
+         just = [o for o in gone if o['cx'] < x1 + JUST_WENT]
+@@ -367,7 +393,7 @@
+                 self._stop(t, 'beam_missed')
+             elif not q and 't_first_s' not in rel:
+                 self._stop(t, 'feed_belt_empty')
+-            elif q and self.goal == 1. and max(o['cx'] for o in q) > x1 - CREEP_ZONE:
++            elif q and self.goal == 1. and max(self._lead_x(o) for o in q) > x1 - CREEP_ZONE:
+                 self.goal = self.creep
+                 rel['t_creep_s'] = round(t, 3)
+         elif self.phase in ('stopped', 'empty'):
+@@ -392,13 +418,13 @@
+                     self.staging, self.goal = False, 0.
+                 self.counts['unsure_waits'] = self.counts.get('unsure_waits', 0) + 1
+             elif self.predict:
+-                lead = max(o['cx'] for o in q)
+-                if face_home and not self.staging and lead >= x1 - CREEP_ZONE - STAGE_STOP - STAGE_SLACK \
+-                        and self._clear_v(gone, q):
++                lead = max(self._lead_x(o) for o in q)
++                if face_home and not beam_cut and not self.staging \
++                        and lead >= x1 - CREEP_ZONE - STAGE_STOP - STAGE_SLACK and self._clear_v(gone, q):
+                     self.start(t)
+                 else:
+                     self._stage_v(t, lead, bool(across))
+-            elif all(o['x0'] > self.lane_in for o in gone) and face_home:
++            elif all(o['x0'] > self.lane_in for o in gone) and face_home and not beam_cut:
+                 self.start(t)
+ 
+     def _clear_v(self, gone, q):
+@@ -416,13 +442,40 @@
+                           + (self.lane_in - max(rear, self.funnel_in)) / (min(v, V_FACE) if face_ahead else v))
+         if t_clear == 0.:
+             return True
+-        k = max(q, key=lambda o: o['cx'])
+-        x1, g = self.g['x1'], self.g
+-        d_c = max(0., x1 - k['cx'])
++        k = max(q, key=self._lead_x)                    # the next to go; a blob: the earliest its front lump can
++        x1, g, lead = self.g['x1'], self.g, self._lead_x(k)
++        d_c = max(0., x1 - lead)
+         t_tip = max(0., d_c - CREEP_ZONE) / g['speed_m_s'] + min(d_c, CREEP_ZONE) / g['creep_speed_m_s'] + TIP_S
+-        t_arrive = t_tip + max(0., self.funnel_in - (x1 + float(k['x1']) - k['cx'])) / self.cfg['v_belt']
++        t_arrive = t_tip + max(0., self.funnel_in - (x1 + float(k['x1']) - lead)) / self.cfg['v_belt']
+         return t_clear + RELEASE_MARGIN_S <= t_arrive
+ 
++    def _mark_blobs(self, view):
++        """Vision: which objects may hold more than one lump. The cameras count several (n_est: tracks that ran
++        together, or an outline clearly not convex), or the outline has not looked like one convex lump (solid
++        below SOLID_SURE) for BLOB_FRAMES frames running. It stays a blob until it has looked like one lump for
++        UNBLOB_FRAMES: the shape measure crosses its thresholds from frame to frame, and a rule read off single
++        frames would stage on the frames that say 'one lump'."""
++        for tid, o in view.items():
++            several = o.get('n_est', 1) > 1
++            n = self.blob_run.get(tid, 0)
++            n = max(n, 0) + 1 if several or o.get('solid', 1.) < SOLID_SURE else min(n, 0) - 1
++            self.blob_run[tid] = n
++            if several or n >= BLOB_FRAMES:
++                self.blobs.add(tid)
++            elif n <= -UNBLOB_FRAMES:
++                self.blobs.discard(tid)
++        self.blobs &= set(view)
++        self.blob_run = {tid: n for tid, n in self.blob_run.items() if tid in view}
++
++    def _lead_x(self, o):
++        """Vision: how far forward the centroid of the leading lump in object o can be. One lump: its outline
++        centroid. A blob (_mark_blobs): the cameras cannot see which lump is in front or how long it is, only
++        that its centroid lies at least nose_min behind the blob's front edge. Until 2026-10-04 a blob was led by
++        its own centroid (--blob-lead centroid, kept for comparison)."""
++        if self.blob_lead == 'front' and o.get('tid') in self.blobs:
++            return max(o['cx'], o['x1'] - self.nose_min)
++        return o['cx']
++
+     def _stage_v(self, t, lead, across):
+         x1 = self.g['x1']
+         if self.staging:
+@@ -430,19 +483,31 @@
+                 self.staging, self.goal = False, 0.
+                 self.events.append(dict(t_s=round(t, 3), event='staged', lead_to_edge_m=round(x1 - lead, 3)))
+         elif not across and self.phase == 'stopped' and lead < x1 - CREEP_ZONE - STAGE_STOP - STAGE_SLACK:
+-            self.staging, self.goal = True, 1.
++            self.staging, self.goal, self.staged = True, 1., True
+             self.counts['stagings'] += 1
+             self.events.append(dict(t_s=round(t, 3), event='staging'))
+ 
+     def _sure(self, view):
+         """Vision only: every object between STAGE_REACH behind the head edge and the lane entry is seen now
+-        with CONF_OK or better. One the cameras are unsure of holds the release and the staging."""
+-        return all(o['conf'] >= CONF_OK and not o.get('coasting') for o in view.values()
+-                   if o['x1'] > self.g['x1'] - STAGE_REACH and o['x0'] < self.lane_in)
++        with CONF_OK or better. One the cameras are unsure of holds the release and the staging. A blob still on
++        the feed belt is the exception (--blob-lead front): what is in doubt about it is how many lumps it holds,
++        not where it is, and it is led by its front edge whatever the count. It only has to be SEEN (conf_seen,
++        the confidence without the shape term); otherwise the feed belt would wait for as long as the blob looks
++        neither like one lump nor like two."""
++        x1 = self.g['x1']
++        for o in view.values():
++            if not (o['x1'] > x1 - STAGE_REACH and o['x0'] < self.lane_in):
++                continue
++            blob = self.blob_lead == 'front' and o.get('tid') in self.blobs and o['cx'] <= x1 + WENT_MARGIN
++            if o.get('coasting') or (o.get('conf_seen', o['conf']) if blob else o['conf']) < CONF_OK:
++                return False
++        return True
+ 
+     def audit(self, t, com_x):
+         """Vision only, for the verification: which true lumps went over the edge in which release (true
+-        centroid past the edge). com_x: {lump: true centroid x} of the lumps still on the machine."""
++        centroid past the edge), which of them after its stop, and which of those only once the belt had been
++        run again for staging ('lumps_in_staging': carried over with no release decided, not by the release's
++        own stopping distance). com_x: {lump: true centroid x} of the lumps still on the machine."""
+         for k, x in com_x.items():
+             if k not in self.lumps_went and x > self.g['x1'] and self.releases:
+                 rel = self.releases[-1]
+@@ -450,6 +515,8 @@
+                 rel.setdefault('lumps', []).append(k)
+                 if rel['t_stop_s'] is not None:
+                     rel.setdefault('lumps_after_stop', []).append(k)
++                    if self.staged:
++                        rel.setdefault('lumps_in_staging', []).append(k)
+ 
+     # ---- predictive release ----------------------------------------------------------------------
+     def _speed(self, k, view):
+@@ -503,10 +570,19 @@
+     def report(self):
+         sizes = [len(r['lumps' if self.vision else 'members']) for r in self.releases
+                  if r.get('lumps' if self.vision else 'members')]
++        # Which lumps went, and which of them after the stop. With vision the controller has no lump identities:
++        # self.released and counts['after_stop'] belong to the oracle path and stay empty, so the report takes
++        # both from the verification record (audit). Until 2026-10-04 it read the oracle's, and a vision run
++        # listed every lump as never released
++        went = [k for r in self.releases for k in r.get('lumps', [])] if self.vision else list(self.released)
++        after_stop = (sum(len(r.get('lumps_after_stop', [])) for r in self.releases) if self.vision
++                      else self.counts['after_stop'])
++        in_staging = sum(len(r.get('lumps_in_staging', [])) for r in self.releases)
+         return dict(geometry=self.g, releases=self.releases, events=self.events, final_phase=self.phase,
+-                    next_release_rear_past_x_m=round(self.lane_in, 4), released_order=self.released,
+-                    never_released=[k for k in range(self.n) if k not in self.released],
+-                    counts=dict(self.counts, releases=len(sizes), single=sum(s == 1 for s in sizes),
++                    next_release_rear_past_x_m=round(self.lane_in, 4), released_order=went,
++                    never_released=[k for k in range(self.n) if k not in went],
++                    counts=dict(self.counts, after_stop=after_stop, in_staging=in_staging, releases=len(sizes),
++                                single=sum(s == 1 for s in sizes),
+                                 lumps_per_release={str(s): sizes.count(s) for s in sorted(set(sizes))}),
+                     held_by_station_s=round(self.held_s, 2),
+                     **(dict(release='predict', funnel_mouth_x_m=round(self.funnel_in, 4),
+--- a/singulator/trial.py (2026-10-04 之前)
++++ b/singulator/trial.py (10-04 交付)
+@@ -25,9 +25,12 @@
+   early      提前被下带拖走: a lump touches the belt below while its centroid is still behind x1 (the belt below
+              has hold of a lump the feed belt still carries), and 'dragged' when it also went within DRAG_S
+              of that contact while the feed belt stood still;
+-  double     两块同时翻落: a release in which two or more lumps went, with the time between them;
++  double     两块同时翻落: a release in which two or more lumps went, with the time between them; 'in_staging'
++             lists the lumps that went only once the belt had been run again for staging (no release decided);
+   stops      带料停车距离: every feed belt stop -- belt travel from the stop command to rest, and how far the
+-             lumps still on the feed belt slid meanwhile;
++             lumps still on the feed belt slid meanwhile. A stop the feeder ends before the belt is at rest
++             (staging, the next release or a jog runs it again) has no stop distance: it is listed apart
++             (stops_interrupted) and kept out of the maxima;
+   apart      下游能否独立计量: for each lump after the first, the clear gap to the lump before it on the belt
+              below once it lies wholly on it (rear SETTLE_X past the belt start); under APART it would reach
+              the measuring belt with the one before -- not measurable alone.
+@@ -218,6 +221,15 @@
+                                    x0={k: float(data.xipos[self.lumps[k].body][0]) for k in on}, done=False))
+         for s in self.stops:
+             if not s['done']:
++                if feeder.goal > 0.:
++                    # the feeder runs the belt again (staging, the next release, a jog) before it came to rest: this
++                    # stop has no stop distance. Until 2026-10-04 the record stayed open through the run that
++                    # followed and booked all of it as the stop (seed 392: 0.756 m of 'stop travel' over 8.16 s)
++                    s.update(done=round(t, 3), travel_m=round(s['travel_m'], 4), stop_time_s=round(t - s['t_s'], 3),
++                             interrupted=('jog' if feeder.jog is not None else 'staging' if feeder.staging
++                                          else 'release'))
++                    del s['x0']
++                    continue
+                 s['travel_m'] += belts.feed['f'] * self.fd['speed_m_s'] * .01
+                 if belts.feed['f'] < 1e-4:
+                     s['done'] = round(t, 3)
+@@ -236,28 +248,32 @@
+             r['dragged'] = bool(r['lower_before_tip'] and r['t_tip'] is not None
+                                 and r['t_tip'] - r['t_lower'] <= DRAG_S and r.get('feed_speed_at_contact', 1.) < 1e-3)
+         who = 'lumps' if feeder.vision else 'members'       # vision: the true lumps that went (verification)
+-        rels = [dict(release=x['release'], lumps=list(x[who]), after_stop=list(x['after_stop']),
+-                     jogs=x['jogs'], stop=x['stop'],
++        late = 'lumps_after_stop' if feeder.vision else 'after_stop'   # ... and those that went after the stop
++        rels = [dict(release=x['release'], lumps=list(x[who]), after_stop=list(x.get(late, [])),
++                     in_staging=list(x.get('lumps_in_staging', [])), jogs=x['jogs'], stop=x['stop'],
+                      tip_spread_s=(round(max(self.rec[k]['t_tip'] for k in x[who])
+                                          - min(self.rec[k]['t_tip'] for k in x[who]), 3)
+                                    if len(x[who]) > 1 and all(self.rec[k]['t_tip'] for k in x[who]) else None))
+                 for x in feeder.releases if x.get(who)]
+         gaps = [r['gap_before_m'] for r in recs if r['gap_before_m'] is not None and math.isfinite(r['gap_before_m'])]
+         close = [r for r in recs if r['gap_before_m'] is not None and r['gap_before_m'] < APART]
+-        stops = [s for s in self.stops if s.get('done')]
++        stops = [s for s in self.stops if s.get('done') and not s.get('interrupted')]    # the belt came to rest
++        cut = [s for s in self.stops if s.get('interrupted')]                             # run again before that
+         fin = lambda v: None if v is None or not math.isfinite(v) else v
+         return dict(case=self.cfg['layout'], head=self.fd.get('head'), step_m=self.fd['step_m'],
+                     x1=self.x1, x_lower=self.x_lower,
+                     lumps=[{k: fin(v) if isinstance(v, float) else v for k, v in r.items()} for r in recs],
+-                    releases=rels, stops=stops,
++                    releases=rels, stops=stops, stops_interrupted=cut,
+                     summary=dict(lumps=len(recs), went=sum(r['t_tip'] is not None for r in recs),
+                                  releases=len(rels), double_releases=sum(len(x['lumps']) > 1 for x in rels),
+                                  lumps_in_doubles=sum(len(x['lumps']) for x in rels if len(x['lumps']) > 1),
+                                  after_stop=sum(len(x['after_stop']) for x in rels),
++                                 in_staging=sum(len(x['in_staging']) for x in rels),
+                                  hangs=sum(r['hang'] for r in recs), jogs=sum(x['jogs'] for x in rels),
+                                  early_contacts=sum(r['lower_before_tip'] for r in recs),
+                                  dragged=sum(r['dragged'] for r in recs),
+                                  not_apart=len(close), gap_min_m=round(min(gaps), 3) if gaps else None,
+                                  stop_travel_max_m=max((s['travel_m'] for s in stops), default=None),
+-                                 lump_slide_max_m=max((s['lump_slide_m'] for s in stops), default=None)),
++                                 lump_slide_max_m=max((s['lump_slide_m'] for s in stops), default=None),
++                                 stops_interrupted=len(cut)),
+                     rules=dict(hang_s=HANG_S, drag_s=DRAG_S, settle_x_m=SETTLE_X, apart_m=APART))
+--- a/singulator/perception.py (2026-10-04 之前)
++++ b/singulator/perception.py (10-04 交付)
+@@ -6,11 +6,16 @@
+ 
+   * vision (Vision): the overhead cameras fused in world coordinates. Per 10 ms frame, per tracked OBJECT:
+     an estimated plan outline (convex polygon), its extents, the outline's area centroid (not the centre of
+-    mass: a camera cannot see that), the top height, the velocity from the track, a recognition confidence,
+-    the estimated number of lumps in it, a track id and its lineage (the ids it was merged or split from).
++    mass: a camera cannot see that), the top height, the velocity from the track, a recognition confidence
++    (conf; conf_seen is the same without the shape term: how surely the object is seen at all, whatever it
++    holds), the estimated number of lumps in it, a track id and its lineage (the ids it was merged or split from).
+     Frames reach the controllers LATENCY_S late. Lumps closer than SEG_GAP form one blob -- the cameras
+     cannot separate them; a blob counts as more than one lump when a merge of two tracks made it or when
+-    its outline is clearly not convex. A track that vanishes where lumps do not leave the line is LOST: the
++    its outline is clearly not convex. A merge adds up the counts of the tracks the cameras were still
++    following; a ghost -- a track no blob has matched for GHOST_S, left behind when the blob it followed came
++    apart -- adds nothing (2026-10-04). A blob that came apart keeps its lineage in its pieces, also when
++    neither piece lies near its centroid (SPLIT_PAD, 2026-10-04). A track that vanishes where lumps do not
++    leave the line is LOST: the
+     vision is then not healthy, and the controllers stop until every lost object is found again where it
+     was lost;
+   * beams (Beam): through-beams with a 20 ms debounce, injected faults, and three diagnoses by the cameras
+@@ -49,8 +54,12 @@
+ VIS_FULL = .9          # ... and fully trusted from this fraction on
+ MATCH_GATE = .20       # m: a track and a blob are the same object within this (at 0.4 m/s a frame is 4 mm)
+ LOST_S = .20           # s: a track without a blob for this long is dropped (lost, unless at an exit)
++GHOST_S = .015         # s: a track no blob has matched for longer than this (one frame missed) is a ghost: its count
++                       # is not added in a merge. None = added, as before 2026-10-04 (for comparison)
+ REACQUIRE = .30        # m: a lost object counts as found again when a new track appears this close to it
+ SPLIT_GAP = .05        # m: a blob that appears this close to a tracked one came off it (the track split)
++SPLIT_PAD = .03        # m: a blob that appears with its centroid inside the last outline (grown by this) of a track
++                       # that found no blob this frame is a piece of it. None = a new object, as before 2026-10-04
+ SHRINK = .75           # a merged blob whose plan area falls below this share of its area at the merge lost a lump
+ BIRTH_S = .10          # s: a new track is fully trusted only after this long
+ SOLID_MULTI = .90      # plan area / hull area below this: the blob holds more than one lump ...
+@@ -85,12 +94,25 @@
+ 
+ 
+ def hull2(P):
+-    """Convex hull of plan points, counter-clockwise."""
++    """Convex hull of plan points, counter-clockwise (Andrew's monotone chain; points on an edge are dropped).
++    Until 2026-10-04 this was scipy's ConvexHull. On Windows scipy opens a temporary file for qhull's messages
++    at every call; at 600 calls per simulated second that was most of a run's wall time (23 s of 33 s, three lumps
++    for 8 s), and runs in parallel processes waited on each other for it (EXPERIMENTS.md S6)."""
+     P = np.asarray(P, float)
+-    try:
+-        return P[ConvexHull(P).vertices]
+-    except Exception:                                   # degenerate (collinear) point set
+-        return P
++    pts = sorted(set(map(tuple, P.tolist())))
++    half = []
++    for seq in (pts, pts[::-1]):                        # lower chain left to right, upper chain right to left
++        h = []
++        for p in seq:
++            while len(h) >= 2:
++                (ax, ay), (bx, by) = h[-2], h[-1]
++                if (bx - ax) * (p[1] - ay) > (by - ay) * (p[0] - ax):
++                    break                               # a left turn at b: b is on the hull so far
++                h.pop()
++            h.append(p)
++        half.append(h[:-1])
++    H = half[0] + half[1]
++    return np.array(H) if len(H) >= 3 else P            # degenerate (collinear) point set: as it is
+ 
+ 
+ def inside(P, x, y, pad=0.):
+@@ -211,7 +233,8 @@
+         self.queue = deque()
+         self.lost, self.events = [], []
+         self.outage = []                                   # injected (t0, t1): every camera dark
+-        self.counts = dict(births=0, merges=0, splits=0, lost=0, left_at_exit=0, reacquired=0, taken_off=0)
++        self.counts = dict(births=0, merges=0, splits=0, lost=0, left_at_exit=0, reacquired=0, taken_off=0,
++                           apart=0)
+         self.err = []                                      # verification: |outline centroid - true centroid|
+         self.latest = Frame()
+         self.latest.t, self.latest.health = 0., dict(ok=True, why=None)
+@@ -311,7 +334,7 @@
+                 k = m['_truth'][0]
+                 c = com[k] if com is not None else (m['cx'], m['cy'])
+                 fr[k] = dict(m, cx=float(c[0]), cy=float(c[1]), tid=k, lineage=frozenset(m['_truth']), n_est=1,
+-                             conf=1., coasting=False, vx=None, vy=None, age_s=None)
++                             conf=1., conf_seen=1., coasting=False, vx=None, vy=None, age_s=None)
+             fr.t, fr.health = t, dict(ok=True, why=None)
+             self.latest = fr
+             return fr
+@@ -333,8 +356,12 @@
+                 done_t.add(near[0])
+             elif len(near) >= 2 and all(by_track[tid] == [i] for tid in near):   # tracks ran together: merge
+                 old = [self.tracks.pop(tid) for tid in near]
++                # A ghost's lumps are already counted: the blob it followed came apart and its pieces went on under
++                # other ids. Added again at every merge, the count of ONE lump lying next to others on the feed
++                # belt reached 13 in 19 s (scatter 7001), and the station held it as 'multi' -- a single lump void
++                live = [o for o in old if GHOST_S is None or t - o['seen'] <= GHOST_S] or old
+                 self._new(t, blobs[i], frozenset().union(*(o['lineage'] for o in old)),
+-                          sum(o['count'] for o in old), 'merges', born=max(o['born'] for o in old))
++                          sum(o['count'] for o in live), 'merges', born=max(o['born'] for o in old))
+                 self.events.append(dict(t_s=round(t, 3), event='merge', tids=list(near)))
+                 done_b.add(i)
+                 done_t.update(near)
+@@ -359,6 +386,7 @@
+                 done_t.add(tid)
+             else:
+                 born.append(m)
++        apart = {}
+         for m in born:
+             # a blob appearing right next to a track that is still seen came off it: the track split. Both
+             # halves get new ids that remember the parent, and the one that stays keeps what is left of its count
+@@ -370,8 +398,24 @@
+                 self.tracks[stay]['hist'] = old['hist']
+                 kid = self._new(t, m, old['lineage'], 1, 'splits', born=old['born'])
+                 self.events.append(dict(t_s=round(t, 3), event='split', tid=old['tid'], into=[stay, kid]))
++                continue
++            # a blob appearing inside the last outline of a track that found no blob this frame is a piece of it.
++            # Two lumps in a row: the outline centroid of their blob lies between them, more than MATCH_GATE from
++            # either one's own, so when they part neither piece is matched to the blob's track. Until 2026-10-04
++            # both were new objects without a past and the track lingered as a ghost: the station found an item's
++            # object gone and an unknown one in its place, and held a single lump 'track_lost' (touching 7004)
++            src = [] if SPLIT_PAD is None else [
++                tr for tid, tr in self.tracks.items() if tid not in done_t and tr['seen'] < t - 1e-9
++                and inside(tr['m']['pts'], m['cx'], m['cy'], pad=SPLIT_PAD)]
++            if src:
++                old = min(src, key=lambda tr: math.hypot(m['cx'] - tr['m']['cx'], m['cy'] - tr['m']['cy']))
++                apart.setdefault(old['tid'], []).append(self._new(t, m, old['lineage'], 1, 'splits', born=old['born']))
+             else:
+                 self._new(t, m)
++        for tid, kids in apart.items():                                       # the blob's own track ends here
++            del self.tracks[tid]
++            self.counts['apart'] += 1
++            self.events.append(dict(t_s=round(t, 3), event='split', tid=tid, into=kids, apart=True))
+         for tid in [tid for tid in list(self.tracks) if tid not in done_t]:
+             tr = self.tracks[tid]
+             if t - tr['seen'] < LOST_S - 1e-9:
+@@ -392,13 +436,13 @@
+                 h.pop(0)
+             m, v, age = tr['m'], self.velocity(h), t - tr['born']
+             coasting = tr['seen'] < t - 1e-9
+-            conf = 0. if coasting else min(1., max(0., (m['vis'] - VIS_MIN) / (VIS_FULL - VIS_MIN)))
+-            conf *= min(1., age / BIRTH_S)
+-            if SOLID_MULTI <= m['solid'] < SOLID_SURE:
+-                conf *= .5
++            seen = 0. if coasting else min(1., max(0., (m['vis'] - VIS_MIN) / (VIS_FULL - VIS_MIN)))
++            seen *= min(1., age / BIRTH_S)
+             if v and math.hypot(*v) > FAST:
+-                conf *= .5
+-            fr[tr['tid']] = dict(m, tid=tr['tid'], lineage=tr['lineage'], conf=round(conf, 3), coasting=coasting,
++                seen *= .5
++            conf = seen * (.5 if SOLID_MULTI <= m['solid'] < SOLID_SURE else 1.)   # one lump or two: not sure
++            fr[tr['tid']] = dict(m, tid=tr['tid'], lineage=tr['lineage'], conf=round(conf, 3),
++                                 conf_seen=round(seen, 3), coasting=coasting,
+                                  n_est=max(tr['count'], 2 if m['solid'] < SOLID_MULTI else 1),
+                                  vx=None if v is None else v[0], vy=None if v is None else v[1], age_s=round(age, 3))
+         fr.t, fr.health = t, self._health(t)
+--- a/singulator/config.py (2026-10-04 之前)
++++ b/singulator/config.py (10-04 交付)
+@@ -40,8 +40,22 @@
+                    help="when the feed belt lets the next lump go: 'predict' (default) stages the next lump at the "
+                         "creep zone and lets it go as soon as the ones before are predicted to be out of the funnel "
+                         "when it gets there; 'lane' once every released lump is in the straight lane")
++    p.add_argument('--blob-lead', choices=('front', 'centroid'), default='front',
++                   help="--sensing vision: how the feed belt leads a blob (lumps lying against each other, one "
++                        "object to the cameras): 'front' (default) = by its front edge, as far forward as the "
++                        "centroid of the lump in front can be; 'centroid' = by the blob's outline centroid, as "
++                        "before 2026-10-04 (for comparison: staging then carries the lump in front over the edge "
++                        "with no release decided)")
+     for key, value in STATION_DEFAULTS.items():
+         p.add_argument('--' + key.replace('_', '-'), type=float, default=value)
++    p.add_argument('--weigh-stop', choices=('rear', 'centre'), default='rear',
++                   help="where the measuring belt stops an item: 'rear' (default) = as soon as it is wholly on the "
++                        "belt (its rear 5-12 cm past the joint); 'centre' = in the middle of the weigh zone, so a "
++                        "round lump that rocks after the stop does not roll back to the joint")
++    p.add_argument('--buffer-approach', choices=('full', 'slow'), default='full',
++                   help="how the buffer belt brings its lead item to the joint: 'full' (default) = at its own speed; "
++                        "'slow' = at the measuring belt's speed over the last 0.45 m (it stops shorter at S3 and is "
++                        "not thrown onto the slower belt)")
+     p.add_argument('--sensing', choices=('oracle', 'vision'), default='vision',
+                    help="what the controllers read: 'vision' (default) = modelled sensor signals (estimated "
+                         "outlines, velocity and confidence from the cameras, debounced beams with diagnoses, the "
+--- a/singulator/station.py (2026-10-04 之前)
++++ b/singulator/station.py (10-04 交付)
+@@ -45,6 +45,10 @@
+   implausible  measured density outside DENSITY_OK (a part of the weight carried elsewhere reads low);
+   tare         the empty-scale reading before this item was off by more than TARE_TOL (something left on M);
+   track_lost   the cameras lost the item's object on the way and found it again (identity not certain).
++An item found good waits at rest on M until the plate is in position for it. It is still watched (nothing else
++within ISO_GAP, one object of one lump): a lump that reaches it in that time makes it void after all (2026-10-04;
++until then nothing looked once the route was known, and a round lump that rolled on over the joint after its stop
++at S3 went into the same bin with it, unmeasured).
+ A void item is HELD: M does not discharge it, the plate does not move for it, the feed belt releases nothing
+ more, B stages its lead at S3 and stops, and the section upstream stops as soon as B cannot take the next
+ lump (the second version's occupancy rule). On the prototype someone then separates, cleans and re-measures
+@@ -59,6 +63,14 @@
+      STAGE_CAM past the line (then S3 is suspect) -- and M cannot take it;
+   M  runs while empty, receiving or discharging; stops once an item is wholly on it (estimated rear
+      CLEAR + V_MARGIN past the joint) and the item before has left; at rest it weighs and scans;
++  two optional rules (2026-10-04; EXPERIMENTS.md S5 tried them as a patch, S6 as options; off by default):
++     --weigh-stop centre: M carries an item that is wholly on it further, until the item is in the middle of the
++        weigh zone (or its front is at the stop position: a long item stops as before). A round lump rocks after
++        the stop; stopped with its rear 5-12 cm past the joint it can roll back to the joint ('outside');
++     --buffer-approach slow: B runs at M's speed while the front of its lead item is within APPROACH of the
++        joint. The lead then meets S3 and the joint at 0.4 m/s whatever M is doing: it stops shorter at S3 (at
++        0.8 m/s a large round lump cut the 5 cm high beam late and its nose came to rest over the joint, in the
++        scanner's zone: the item being weighed was void), and it is not thrown onto the slower M;
+   plate  moves to the route's position the moment the route is known, once everything sent before has left
+      its path: S4 has seen a gangue lump fall through and is clear again AND the cameras see the plate zone
+      empty (coal: the zone empty). Not cleared within PATH_TIMEOUT_S after its discharge: stop the line.
+@@ -98,6 +110,8 @@
+ STAGE_CAM = .03       # m: the cameras see the lead's front this far past S3 while S3 is clear: stop B anyway
+ STAGE_ROOM = .05      # m: a staged lead stops at least this far short of B's far end
+ ACCEPT_AFTER = .30    # m: M takes the next item while discharging once the item on it has its rear this far on M
++APPROACH = .45        # m: --buffer-approach slow: B runs at M's speed while its lead's front is this close to the joint
++                      # (S3 is 0.22 m before the joint at 0.8 m/s, and B needs 0.09 m to come down to 0.4 m/s)
+ GROUP_GAP = .10       # m: a lump going over the head edge this close behind the last one joins its item
+ HOLD_ZONE = .10       # m: a lump whose centroid is this close to the head edge is about to go over it
+ ENTRY_ROOM = .55      # m: B takes a lump only with this much free belt behind its last lump
+@@ -276,6 +290,8 @@
+         self.ext = (deg, np.array([separator.state(c, a)['piston_extension_m'] for a in deg]))
+         self.rate = (c.open_deg - c.closed_deg) / cfg['separator_swing_s']      # plate, deg/s
+         self.v, self.vb = cfg['station_speed'], cfg['buffer_speed']     # M, B
++        self.centre = cfg.get('weigh_stop', 'rear') == 'centre'
++        self.slow = cfg.get('buffer_approach', 'full') == 'slow'
+         # drive factors (1 = rated speed) and their goals; u is the whole section upstream of B
+         self.u, self.b, self.m = 1., 0., 0.
+         self.u_goal, self.b_goal, self.m_goal = 1., 1., 1.
+@@ -399,14 +415,19 @@
+                 it.update(stage='transfer', t_transfer_s=round(t, 3))
+             if it['stage'] == 'transfer' and x0 > x_j + CLEAR + self.vm:
+                 it['stage'] = 'onm'
+-            if it['stage'] in ('transfer', 'onm') and self.m_goal == 1.                     and x1 >= m_end - FRONT_MARGIN - self.v * (RAMP_S / 2 + OBS_DT):
++            first = not any(on_m(e) for e in self.line[:i])
++            at_front = x1 >= m_end - FRONT_MARGIN - self.v * (RAMP_S / 2 + OBS_DT)
++            # --weigh-stop centre: an item wholly on M, M free for it, rides on to the middle of the weigh zone
++            riding = self.centre and it['stage'] == 'onm' and first
++            centred = (x0 + x1) / 2 >= (x_j + m_end) / 2 - self.v * (RAMP_S / 2 + OBS_DT)
++            if it['stage'] in ('transfer', 'onm') and self.m_goal == 1. and at_front and not riding:
+                 # M is carrying it and its front is at the stop position before the item is wholly on (it is longer
+                 # than the belt, or its lumps have drawn apart; seed 4014): stop now -- nothing leaves M unmeasured --
+                 # and hold it
+                 self._void(it, 'outside', detail='front at the measuring belt head before the item was on it')
+                 it.update(stage='measure', t_stop_s=round(t, 3), tare_N=round(self.tare, 2))
+                 self.samples = []
+-            if it['stage'] == 'onm' and not any(on_m(e) for e in self.line[:i]):
++            if it['stage'] == 'onm' and first and (not self.centre or centred or at_front):
+                 it.update(stage='measure', t_stop_s=round(t, 3), tare_N=round(self.tare, 2))
+                 self.samples = []
+             if it['stage'] == 'discharge' and x0 > m_end + CLEAR:
+@@ -423,6 +444,12 @@
+             self._zero()
+         for it in self._stage('measure'):
+             self._measure(t, it, scanner)
++        for it in self._stage('decided'):                     # found good, waiting for the plate: still watched
++            self._isolation(it, zone=False)
++            if it['reasons']:
++                it.update(void=True, revoked=dict(t_s=round(t, 3), route=it.pop('route')))
++                it.pop('route_as_ideal', None)
++                self._hold(t, it)
+         # ---- plate: move the moment the route is known and the path is clear ---------------------------
+         self._plate(t, path_clear)
+         # ---- M: discharge as soon as the plate will be in position in time -----------------------------
+@@ -458,6 +485,8 @@
+             b_goal = self.m_goal * self.v / self.vb           # an item crossing moves only with M, at its speed
+         else:
+             b_goal = 0. if staged and not accepting else 1.
++            if b_goal and self.slow and lead is not None and 'box' in lead and lead['box'][1] > x_j - APPROACH:
++                b_goal = self.v / self.vb                     # --buffer-approach slow: the last stretch at M's speed
+         if b_goal == 0. and self.b_goal > 0.:
+             self.counts['buffer_stops'] += 1
+             self._event(t, 'buffer_stop', item=None if lead is None else lead['item'])
+@@ -663,15 +692,13 @@
+             if self.zero_off >= ZERO_OFF_S - 1e-9:
+                 self.tare, self.zero_off = self.cell, 0.       # re-zero there: the item will be void (tare)
+ 
+-    def _measure(self, t, it, scanner):
+-        """Weigh (steady indicator) and scan (scan_s) at rest, together; the void checks all along."""
+-        rest = it['t_stop_s'] + RAMP_S                    # M at rest from here
+-        if t < rest - 1e-9:
+-            return
++    def _isolation(self, it, zone=True):
++        """An item at rest on M, every sample: inside the weigh zone (zone: while it is weighed -- once its
++        measurement stands, a lump that rocks back towards the joint is still the lump that was measured), nothing
++        else close, one object of one lump."""
+         g, box = self.g, it.get('box')
+         x_j, m_end = g['buffer']['x1'], g['measure']['x1']
+-        # isolation, every sample at rest: inside the weigh zone, nothing else close, one object of one lump
+-        if box is not None and (box[0] < x_j + ISO_MARGIN or box[1] > m_end - ISO_MARGIN):
++        if zone and box is not None and (box[0] < x_j + ISO_MARGIN or box[1] > m_end - ISO_MARGIN):
+             self._void(it, 'outside', detail='outline %.3f..%.3f m, weigh zone %.3f..%.3f m'
+                        % (box[0], box[1], x_j + ISO_MARGIN, m_end - ISO_MARGIN))
+         mine = set(it['now'])
+@@ -680,6 +707,13 @@
+             self._void(it, 'outside', detail='another object within %.2f m' % ISO_GAP)
+         if it['n_obj_max'] > 1 or it['n_est_max'] > 1:
+             self._void(it, 'multi', detail='objects %d, estimated lumps %d' % (it['n_obj_max'], it['n_est_max']))
++
++    def _measure(self, t, it, scanner):
++        """Weigh (steady indicator) and scan (scan_s) at rest, together; the void checks all along."""
++        rest = it['t_stop_s'] + RAMP_S                    # M at rest from here
++        if t < rest - 1e-9:
++            return
++        self._isolation(it)
+         if abs(it['tare_N']) > TARE_TOL:
+             self._void(it, 'tare', detail='empty reading %.1f N' % it['tare_N'])
+         # the truth, for the verification: what physically loads the weigh frame, and what else it touches
+--- a/checks/feeder_regression_checks.py (2026-10-04 之前)
++++ b/checks/feeder_regression_checks.py (10-04 交付)
+@@ -3,18 +3,22 @@
+ Run: python checks/feeder_regression_checks.py
+ FeederChecks (--feeder-release lane) / PredictiveRelease (the default): the oracle view (--sensing oracle: true
+ centroids and hulls). VisionRelease: the default path on camera objects (singulator/perception.py): the
+-centroid margin, the release judged by region because track ids churn at the head edge, and objects the
+-cameras cannot vouch for holding the release.
++centroid margin, the release judged by region because track ids churn at the head edge, objects the
++cameras cannot vouch for holding the release, no release while the drop beam is cut, the report of which
++lumps went, and blobs (lumps the cameras cannot tell apart) led by their front edge: staged and crept from it,
++not held for their uncertain count, a lump carried over by staging recorded. TransferStops: the feed belt's stop
++record (singulator/trial.py) on a synthetic belt.
+ These checks establish controller decisions, not whether the step-down transfer works in hardware.
+ """
+ import sys
+ import unittest
+ from pathlib import Path
++from types import SimpleNamespace
+ 
+ import numpy as np
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+-from singulator import feeder, machine, perception  # noqa: E402
++from singulator import feeder, machine, perception, trial  # noqa: E402
+ from singulator.config import parse_config  # noqa: E402
+ from singulator.feeder import CLEAR, Feeder  # noqa: E402
+ 
+@@ -188,12 +192,19 @@
+ 
+ CFGV = parse_config(['--no-video'])       # vision: the default
+ DV = machine.derive(CFGV)
++CFGVL = parse_config(['--feeder-release', 'lane', '--no-video'])      # vision, the 'lane' release rule
++DVL = machine.derive(CFGVL)
+ 
+ 
+ def vobj(x0, x1, conf=1., vx=None, y1=.6):
+     return dict(cx=(x0 + x1) / 2, x0=x0, x1=x1, y1=y1, conf=conf, coasting=False, vx=vx)
+ 
+ 
++def vblob(tid, x0, x1, solid=.80, n_est=2, conf=1., conf_seen=1.):
++    """A blob: lumps lying against each other, one object to the cameras (its shape is not one convex lump's)."""
++    return dict(vobj(x0, x1, conf=conf), tid=tid, solid=solid, n_est=n_est, conf_seen=conf_seen)
++
++
+ class VisionRelease(unittest.TestCase):
+     def test_gone_only_past_the_centroid_margin(self):
+         f = Feeder(CFGV, DV, 2)
+@@ -230,6 +241,175 @@
+                 self.assertEqual(len(f.releases), 1)
+         self.assertGreaterEqual(f.counts['unsure_waits'], 2)
+ 
++    def test_no_release_while_the_drop_beam_is_cut(self):
++        """A lump tipping over the edge cuts the beam before the cameras call it gone (outline centroid not yet
++        WENT_MARGIN past the edge): it is still queued, and the lead. Until 2026-10-04 a release started on it at
++        once and the beam stopped it one sample later, over and over (seed 392: four empty releases in 0.07 s)."""
++        for cfg, d in ((CFGV, DV), (CFGVL, DVL)):                     # predictive rule, lane rule
++            with self.subTest(release=cfg['feeder_release']):
++                f = Feeder(cfg, d, 2)
++                f.start(0.)
++                tipping = vobj(X - .22, X + .26)                      # centroid 2 cm past the edge: not gone yet
++                f.observe(0., {1: tipping}, True, True)               # its nose cuts the beam: stop
++                self.assertEqual((f.phase, f.releases[0]['stop']), ('stopped', 'beam'))
++                for i in range(1, 8):                                 # still tipping across the beam
++                    f.observe(i * .01, {1: tipping}, True, True)
++                self.assertEqual((len(f.releases), f.phase, f.goal), (1, 'stopped', 0.))
++                # the same view once the beam is clear again (it has settled back on the edge): the next release
++                # starts on it, as before
++                f.observe(.08, {1: tipping}, False, True)
++                self.assertEqual((len(f.releases), f.phase), (2, 'feeding'))
++
++    def test_the_report_names_the_lumps_that_went(self):
++        """The cameras' objects carry no lump identity, so f.released (the oracle path's) stays empty; the report
++        takes the lumps that went from the verification record. Until 2026-10-04 it listed every lump of a
++        vision run as never released, and counted none as gone after the stop."""
++        f = Feeder(CFGV, DV, 3)
++        f.start(0.)
++        f.audit(0., {0: X - .50, 1: X + .01, 2: X - .90})             # lump 1's true centroid is over the edge
++        f.observe(.01, {7: vobj(X - .12, X + .30)}, True, True)       # the beam stops the release
++        f.audit(.02, {0: X + .02, 1: X + .20, 2: X - .90})            # lump 0 follows after the stop
++        r = f.report()
++        self.assertEqual(f.released, [])
++        self.assertEqual((r['released_order'], r['never_released']), ([1, 0], [2]))
++        self.assertEqual((r['counts']['after_stop'], r['counts']['lumps_per_release']), (1, {'2': 1}))
++
++    # ---- blobs: led by the front edge (2026-10-04) ----------------------------------------------------
++    FAR = vobj(LANE_IN + .1, LANE_IN + .5, vx=.4)                      # the lump released before, in the lane
++
++    def staged_blob(self, cfg):
++        """The first lump has gone; a blob 0.70 m long is staged behind it (the face away: no release yet).
++        Returns the feeder and where the blob's front edge stands when the staging stops."""
++        f = Feeder(cfg, DV, 3)
++        f.start(0.)
++        f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)         # the first lump tips and cuts the beam
++        front, t = X - .30, 1.
++        for _ in range(600):
++            f.observe(t, {6: self.FAR, 9: vblob(9, front - .70, front)}, False, False)
++            if f.counts['stagings'] and not f.staging:
++                return f, front
++            front += f.goal * DV['feeder']['speed_m_s'] * .01
++            t = round(t + .01, 4)
++        self.fail('staging never stopped')
++
++    def test_a_blob_is_staged_by_its_front_edge(self):
++        """The lump in front of a blob has its centroid well ahead of the blob's. Until 2026-10-04 the blob's own
++        centroid was staged at the creep zone, and that lump went over the edge on the way (S4 batches: 11 of 19
++        releases of two or more, up to 9.9 s after the release they were booked to)."""
++        nose = feeder.NOSE_SHARE * CFGV['size_min']
++        stop = X - feeder.CREEP_ZONE - feeder.STAGE_STOP
++        f, front = self.staged_blob(CFGV)
++        self.assertAlmostEqual(front - nose, stop, delta=.002)        # the furthest its leading centroid can be
++        self.assertLess(front - .20, X)                               # a 0.40 m lump in front has not gone
++        g, front_c = self.staged_blob(parse_config(['--blob-lead', 'centroid', '--no-video']))
++        self.assertAlmostEqual(front_c - .35, stop, delta=.002)       # as before: the blob's centroid at the zone ...
++        self.assertGreater(front_c - .20, X + feeder.WENT_MARGIN)     # ... and that lump is over the edge
++
++    def test_a_release_creeps_a_blob_from_its_front_edge_to_the_beam(self):
++        f, front = self.staged_blob(CFGV)
++        v, see = DV['feeder']['speed_m_s'], lambda x: {6: self.FAR, 9: vblob(9, x - .70, x)}
++        f.observe(10., see(front), False, True)                       # the face is home: the release starts
++        self.assertEqual((len(f.releases), f.phase), (2, 'feeding'))
++        for i in range(1, 40):
++            front += f.goal * v * .01
++            f.observe(10. + i * .01, see(front), False, True)
++        self.assertEqual(f.goal, f.creep)                             # at creep, its centroid still 0.3 m short
++        self.assertLess(front - .35, X - feeder.CREEP_ZONE - .2)
++        f.observe(10.5, see(front), True, True)                       # the lump in front tips: the beam stops it
++        self.assertEqual((f.phase, f.releases[1]['stop']), ('stopped', 'beam'))
++
++    def test_an_outline_that_is_not_one_convex_lump_is_a_blob(self):
++        f = Feeder(CFGV, DV, 2)
++        f.start(0.)
++        def see(t, solid, n_est=1, tid=4):
++            f.observe(t, {tid: vblob(tid, X - .90, X - .30, solid, n_est)}, False, True)
++        see(0., .93)
++        self.assertEqual(f.blobs, set())                              # one frame: noise
++        see(.01, .93)
++        self.assertEqual(f.blobs, {4})                                # two running: a blob
++        for i in range(feeder.UNBLOB_FRAMES - 1):                     # one convex lump again, not yet for long enough
++            see(.02 + i * .01, .99)
++        self.assertEqual(f.blobs, {4})
++        see(.5, .99)
++        self.assertEqual(f.blobs, set())
++        see(.51, .99, n_est=2, tid=5)                                 # counted as two: a blob at once
++        self.assertEqual((f.blobs, set(f.blob_run)), ({5}, {5}))      # and the track that ended is forgotten
++
++    def test_a_blob_of_uncertain_count_does_not_hold_the_release(self):
++        """Its shape says neither one lump nor two (confidence halved), but it is seen well (conf_seen). Led by
++        its front edge it needs no count. Led by its centroid it held the release for as long as it looked so."""
++        for lead, back, releases in (('front', feeder.NOSE_SHARE * CFGV['size_min'], 2), ('centroid', .35, 1)):
++            with self.subTest(blob_lead=lead):
++                f = Feeder(parse_config(['--blob-lead', lead, '--no-video']), DV, 3)
++                f.start(0.)
++                f.observe(0., {1: vobj(X - .12, X + .30)}, True, True)
++                front = X - feeder.CREEP_ZONE - feeder.STAGE_STOP + back      # staged, by either rule
++                blob = vblob(9, front - .70, front, solid=.93, n_est=1, conf=.5)
++                for i in range(1, 6):
++                    f.observe(1. + i * .01, {6: self.FAR, 9: blob}, False, True)
++                self.assertEqual(len(f.releases), releases)
++
++    def test_a_lump_carried_over_by_staging_is_recorded(self):
++        f = Feeder(CFGV, DV, 3)
++        f.start(0.)
++        f.audit(0., {0: X + .01, 1: X - .40, 2: X - .90})             # lump 0 goes in the release
++        f.observe(.01, {7: vobj(X - .12, X + .30)}, True, True)       # the beam stops it
++        f.audit(.02, {1: X + .01, 2: X - .90})                        # lump 1 follows within the stopping distance
++        f.observe(1., {8: vobj(X + .5, X + .9, vx=.4), 9: vobj(X - .90, X - .50)}, False, False)
++        self.assertTrue(f.staging)
++        f.audit(1.5, {2: X + .01})                                    # lump 2 goes while the belt is staging
++        rel = f.releases[0]
++        self.assertEqual((rel['lumps'], rel['lumps_after_stop'], rel['lumps_in_staging']), ([0, 1, 2], [1, 2], [2]))
++        self.assertEqual(f.report()['counts']['in_staging'], 1)
++        f.start(2.)
++        self.assertFalse(f.staged)                                    # the next release starts a new count
++
++
++class TransferStops(unittest.TestCase):
++    """trial.TransferWatch's record of the feed belt's stops, on a synthetic belt (no lumps, no physics)."""
++
++    def setUp(self):
++        self.f = Feeder(CFGV, DV, 0)
++        self.w = trial.TransferWatch(CFGV, DV, SimpleNamespace(ngeom=0), [])
++        self.data, self.belts = SimpleNamespace(ncon=0), SimpleNamespace(feed=dict(f=.3))
++        self.f.start(0.)
++        self.f._stop(1., 'beam')                                      # the stop command, the belt at creep
++
++    def see(self, t, speed):
++        self.belts.feed['f'] = speed
++        self.w.observe(t, self.data, self.f, self.belts)
++
++    def test_a_stop_that_reaches_rest_is_measured(self):
++        for i, speed in enumerate((.3, .2, .1, 0.)):
++            self.see(1. + i * .01, speed)
++        r = self.w.report(self.f)
++        v = DV['feeder']['speed_m_s']
++        self.assertEqual(r['stops_interrupted'], [])
++        self.assertEqual(len(r['stops']), 1)
++        s = r['stops'][0]
++        self.assertEqual((s['release'], s['why'], s['stop_time_s'], s['lump_slide_m']), (0, 'beam', .03, 0.))
++        self.assertAlmostEqual(s['travel_m'], .6 * v * .01, places=4)
++        self.assertEqual((r['summary']['stop_travel_max_m'], r['summary']['stops_interrupted']), (s['travel_m'], 0))
++
++    def test_a_stop_cut_short_has_no_stop_distance(self):
++        """Staging starts 10 ms after the stop command, before the belt is at rest, and runs it for 3 s. Until
++        2026-10-04 the stop record stayed open and booked the whole run as the stop (seed 392: 0.756 m, 8.16 s)."""
++        f = self.f
++        self.see(1., .3)                                              # the record opens
++        f.staging, f.goal = True, 1.
++        for i in range(1, 300):
++            self.see(1. + i * .01, 1.)
++        f.staging, f.goal = False, 0.
++        self.see(4., 0.)
++        r = self.w.report(f)
++        self.assertEqual(r['stops'], [])
++        self.assertEqual([(s['release'], s['interrupted'], s['stop_time_s']) for s in r['stops_interrupted']],
++                         [(0, 'staging', .01)])
++        self.assertLess(r['stops_interrupted'][0]['travel_m'], .001)
++        self.assertEqual((r['summary']['stop_travel_max_m'], r['summary']['lump_slide_max_m'],
++                          r['summary']['stops_interrupted']), (None, None, 1))
++        self.assertTrue(all(s['done'] for s in self.w.stops))         # the bench run's end condition still holds
++
+ 
+ if __name__ == '__main__':
+     unittest.main()
+--- a/checks/station_checks.py (2026-10-04 之前)
++++ b/checks/station_checks.py (10-04 交付)
+@@ -10,12 +10,15 @@
+    lump corridors, the scanner clears a standing lump.
+ 3. Compiled model: belt tops and extents, contact categories, the separator's closed loop in both positions,
+    and every moving part clearing all other equipment (devices included) over its stroke.
+-4. Weighing: a lump at rest on the measuring belt reads its own weight.
++4. Weighing: a lump at rest on the measuring belt reads its own weight. Tracker: the cameras' lump count of an
++   object does not grow when a ghost track runs into it; the pieces of a blob that comes apart keep its lineage.
+ 5. Control on synthetic sensor signals (no physics): a coal lump and a gangue lump through; a void item for
+    every reason is HELD -- no discharge, no plate move, no release -- and taken off the line the line runs on;
++   an item found good is still held if a lump reaches it while it waits for the plate;
+    the plate path needs S4 and the plate-zone camera, with a timeout; staging and the hand-over during a
+    discharge; the section held only when the buffer cannot take a lump; the line frozen while the cameras are
+-   not healthy (stopped if that lasts), stopped by a dirty beam; the stall stop.
++   not healthy (stopped if that lasts), stopped by a dirty beam; the stall stop. Rules: the two optional ones
++   (--weigh-stop centre, --buffer-approach slow).
+ 6. Physics (slow, about 15 min): the acceptance tests of 2026-09-30 -- two lumps laid touching on the buffer
+    belt (weighed together), a lump laid across the joint against the weighed one, the weighed lump pushed back
+    across the joint, the first scan failing: none is sorted as a valid result, each is held and taken off; the
+@@ -233,6 +236,63 @@
+         self.assertFalse(other.get(0, set()))                         # touches nothing off the weigh frame
+ 
+ 
++class Tracker(unittest.TestCase):
++    """perception.Vision's lump count of an object (n_est: the station holds an item 'multi' above 1)."""
++
++    def test_a_ghost_track_adds_no_lumps_to_a_merge(self):
++        """A ghost: a track no blob has matched for a few frames -- what is left when a blob comes apart and its
++        pieces go on under other ids. It still lies inside one of them, and the next frame merges the two tracks.
++        Until 2026-10-04 the merge added the ghost's count: one lump lying next to others on the feed belt was
++        counted as 13 after 19 s (scatter 7001), and the station held it -- a single lump void."""
++        lump = box(-1.5, -1.1, D['feeder']['step_m'], D['feeder']['step_m'] + .30, y0=.3, y1=.7)   # on the feed belt
++
++        def count(ghost_s):
++            keep, perception.GHOST_S = perception.GHOST_S, ghost_s
++            try:
++                v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
++                for i in range(3):
++                    v.frame(i * .01, {0: lump}, lambda a, b: 1.)
++                (tr,) = v.tracks.values()
++                v.tracks[99] = dict(tr, tid=99, lineage=frozenset({99}), count=2, seen=-.01,
++                                    hist=[(-.01, tr['m']['cx'], tr['m']['cy'])])
++                v.next_tid = 100
++                fr = v.frame(.03, {0: lump}, lambda a, b: 1.)
++                (merged,) = v.tracks.values()
++                self.assertEqual((v.counts['merges'], merged['lineage'] >= {99}), (1, True))
++                return merged['count']
++            finally:
++                perception.GHOST_S = keep
++        self.assertEqual(count(perception.GHOST_S), 1)              # the ghost is absorbed: still one lump
++        self.assertEqual(count(None), 3)                            # as before: its own 1 + the ghost's 2
++
++    def test_the_pieces_of_a_blob_that_comes_apart_keep_its_lineage(self):
++        """Two lumps in a row are one blob; its outline centroid lies between them, more than MATCH_GATE from
++        either lump's own. When they part, neither piece is matched to the blob's track. Until 2026-10-04 both were
++        new objects without a past (and the blob's track a ghost): the station found an item's object gone and an
++        unknown one in its place, and held a single lump 'track_lost' (touching 7004)."""
++        z = D['feeder']['step_m']
++        lump = lambda x: box(x, x + .50, z, z + .30, y0=.3, y1=.7)     # on the feed belt, 0.50 m long
++
++        def part(pad):
++            keep, perception.SPLIT_PAD = perception.SPLIT_PAD, pad
++            try:
++                v = perception.Vision(D['devices']['cameras'], np.random.default_rng(0), exits=lambda x, y: False)
++                for i in range(3):
++                    v.frame(i * .01, {0: lump(-1.5), 1: lump(-2.)}, lambda a, b: 0.)        # touching: one blob
++                (blob,) = v.tracks
++                v.frame(.03, {0: lump(-1.44), 1: lump(-2.06)}, lambda a, b: .12)            # 12 cm apart
++                pieces = [tr for tr in v.tracks.values() if tr['seen'] > .025]
++                return blob, v, pieces
++            finally:
++                perception.SPLIT_PAD = keep
++        blob, v, pieces = part(perception.SPLIT_PAD)
++        self.assertEqual((len(pieces), [blob in tr['lineage'] for tr in pieces]), (2, [True, True]))
++        self.assertEqual((blob in v.tracks, v.counts['births'], v.counts['apart']), (False, 1, 1))
++        blob, v, pieces = part(None)                                    # as before: two births and a ghost
++        self.assertEqual((len(pieces), [blob in tr['lineage'] for tr in pieces]), (2, [False, False]))
++        self.assertEqual((blob in v.tracks, v.counts['births'], v.counts['apart']), (True, 3, 0))
++
++
+ # ---- control on synthetic sensor signals --------------------------------------------------------------
+ class Line:
+     """Synthetic sensors for the station controller: every box (8 corners) is a lump and one camera object
+@@ -446,6 +506,25 @@
+         self.assertIn('outside', it['reasons'])
+         self.assertEqual(it['stage'], 'hold')
+ 
++    def test_a_lump_that_reaches_a_decided_item_makes_it_void(self):
++        """A gangue lump is weighed and found good; the plate needs two seconds to open for it and it waits on M.
++        A lump on B rolls on over the joint against it. Until 2026-10-04 nothing looked any more once the route was
++        known: the two went over the plate together, the second one unmeasured (drum head trial, aligned 7011)."""
++        L = Line(densities=(2500., 1300.))
++        s, boxes = L.s, {0: self.far(0), 1: self.far(1)}
++        it = L.onto_measuring_belt(boxes)
++        L.measure(boxes, it, mass=50.)
++        self.assertEqual((it['stage'], it['void'], it['route'], s.plate), ('decided', False, 'gangue', 'opening'))
++        boxes[1] = on_b(XJ - .38, XJ + .02)                             # 3 cm from the waiting item
++        L.see(boxes)
++        self.assertEqual((it['stage'], it['void'], it['reasons']), ('hold', True, ['outside']))
++        self.assertEqual(it['revoked']['route'], 'gangue')
++        self.assertNotIn('route', it)
++        self.assertNotIn('t_discharge_s', it)
++        self.assertEqual((s.m_goal, s.counts['holds']), (0., 1))
++        self.assertTrue(s.inhibit_release)
++        self.assertEqual(s.report()['counts']['void_discharged'], 0)
++
+     def test_a_failed_scan_is_held(self):
+         L = self.L
+         L.verdict = dict(valid=False, reasons=['scan_failed'])
+@@ -622,6 +701,75 @@
+ 
+ 
+ # ---- physics: the acceptance tests ---------------------------------------------------------------------
++class Rules(unittest.TestCase):
++    """The two optional rules of 2026-10-04 (off by default), on synthetic sensor signals."""
++
++    def line(self, *args):
++        cfg = parse_config(['--no-video'] + list(args))
++        return Line(cfg=cfg, d=machine.derive(cfg))
++
++    def test_weigh_stop_centre_carries_the_item_to_the_middle_of_the_weigh_zone(self):
++        for stop, front in (('rear', XJ + .45), ('centre', XJ + .59)):
++            with self.subTest(weigh_stop=stop):
++                L = self.line('--weigh-stop', stop)
++                s, boxes = L.s, {0: box(EDGE - .30, EDGE + .10)}
++                L.see(boxes)
++                L.run_to(0, XJ + .45, boxes)                            # 0.40 m long: wholly on M, rear 5 cm on
++                it = s.items[0]
++                self.assertEqual((it['stage'], s.m_goal), ('measure', 0.) if stop == 'rear' else ('onm', 1.))
++                L.run_to(0, front, boxes)                               # centre: on, to one stop distance short
++                self.assertEqual((it['stage'], s.m_goal), ('measure', 0.))    # ... of the middle (0.386 m)
++                self.assertAlmostEqual(it['box'][1], front, places=6)
++                L.on_m = 0
++                L.measure(boxes, it)
++                self.assertEqual((it['reasons'], it['void'], it['route']), ([], False, 'coal'))
++
++    def test_weigh_stop_centre_still_holds_an_item_that_is_not_wholly_on(self):
++        # the lead of two lumps in one item is at the stop position while the other is still crossing: as before
++        L = self.line('--weigh-stop', 'centre')
++        s = L.s
++        boxes = {0: on_b(EDGE + .02, EDGE + .42), 1: box(EDGE - .38, EDGE + .02)}
++        L.see(boxes, merge=(0, 1))
++        it, lin = s.items[0], {0: {100}, 1: {100}}
++        x, r = EDGE + .42, EDGE + .02
++        while it['stage'] in ('buffer', 'transfer', 'onm') and x < MEND + .2:
++            x += .01
++            r += .01 if x < XJ + .05 else .0033
++            boxes[0] = on_b(x - .40, x)
++            boxes[1] = on_b(r - .40, r) if r - .40 > EDGE else box(r - .40, r)
++            L.see(boxes, lin=lin)
++        self.assertLess(boxes[0][:, 0].max(), MEND)
++        self.assertEqual((it['stage'], s.m_goal, it['reasons']), ('measure', 0., ['outside']))
++
++    def test_buffer_approach_slow_runs_the_last_stretch_at_the_measuring_belts_speed(self):
++        half = CFG['station_speed'] / CFG['buffer_speed']
++        for approach in ('full', 'slow'):
++            with self.subTest(buffer_approach=approach):
++                L = self.line('--buffer-approach', approach)
++                s, boxes = L.s, {0: box(EDGE - .30, EDGE + .10)}
++                L.see(boxes)
++                L.run_to(0, XJ - station.APPROACH - .01, boxes)
++                self.assertEqual(s.b_goal, 1.)
++                L.run_to(0, XJ - station.APPROACH + .02, boxes)         # the lead's front within APPROACH
++                self.assertEqual(s.b_goal, half if approach == 'slow' else 1.)
++                L.run_to(0, XJ - .01, boxes)                            # past S3, M free: on, no stop
++                self.assertEqual((s.b_goal, s.counts['buffer_stops']), (half if approach == 'slow' else 1., 0))
++                L.run_to(0, XJ + .10, boxes)                            # crossing: at M's speed in both
++                self.assertEqual((s.items[0]['stage'], s.b_goal), ('transfer', half))
++
++    def test_buffer_approach_slow_still_stages_at_s3(self):
++        L = self.line('--buffer-approach', 'slow')
++        s = L.s
++        boxes = {0: box(EDGE - 3., EDGE - 2.6), 1: box(EDGE - 4., EDGE - 3.6)}
++        a = L.onto_measuring_belt(boxes)
++        weigh = dict(load=50. * station.G, on=[0])
++        boxes[1] = box(EDGE - .30, EDGE + .10)
++        L.see(boxes, **weigh)
++        L.run_to(1, STOP_X + .01, boxes, **weigh)                       # cuts the staging beam, M busy
++        self.assertEqual((a['stage'], s.items[1]['stage'], s.b_goal, s.counts['buffer_stops']),
++                         ('measure', 'buffer', 0., 1))
++
++
+ def run(*args, duration=180):
+     with tempfile.TemporaryDirectory() as tmp:
+         cfg = parse_config(['--duration', str(duration), '--no-video'] + list(args))

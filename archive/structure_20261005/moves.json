@@ -1,0 +1,170 @@
+[
+  {
+    "from": "EXPERIMENTS.md",
+    "to": "docs/EXPERIMENTS.md"
+  },
+  {
+    "from": "MATERIAL_MODEL.md",
+    "to": "docs/MATERIAL_MODEL.md"
+  },
+  {
+    "from": "REALISM_REVIEW.md",
+    "to": "docs/REALISM_REVIEW.md"
+  },
+  {
+    "from": "TODO.md",
+    "to": "docs/TODO.md"
+  },
+  {
+    "from": "experiments/s6/jobs_all.json",
+    "to": "experiments/s6/jobs/jobs_all.json"
+  },
+  {
+    "from": "experiments/s6/jobs_extra.json",
+    "to": "experiments/s6/jobs/jobs_extra.json"
+  },
+  {
+    "from": "experiments/s6/jobs_holdout.json",
+    "to": "experiments/s6/jobs/jobs_holdout.json"
+  },
+  {
+    "from": "experiments/s6/jobs_mu.json",
+    "to": "experiments/s6/jobs/jobs_mu.json"
+  },
+  {
+    "from": "experiments/s6/jobs_proto.json",
+    "to": "experiments/s6/jobs/jobs_proto.json"
+  },
+  {
+    "from": "experiments/s6/jobs_v6.json",
+    "to": "experiments/s6/jobs/jobs_v6.json"
+  },
+  {
+    "from": "experiments/s6/jobs_v6full.json",
+    "to": "experiments/s6/jobs/jobs_v6full.json"
+  },
+  {
+    "from": "experiments/s6/candidate",
+    "to": "experiments/s6/snapshots/candidate"
+  },
+  {
+    "from": "experiments/s6/candidate2",
+    "to": "experiments/s6/snapshots/candidate2"
+  },
+  {
+    "from": "experiments/s6/candidate3",
+    "to": "experiments/s6/snapshots/candidate3"
+  },
+  {
+    "from": "experiments/s6/out",
+    "to": "experiments/s6/results/out"
+  },
+  {
+    "from": "experiments/s6/out_holdout",
+    "to": "experiments/s6/results/out_holdout"
+  },
+  {
+    "from": "experiments/s6/out_v6",
+    "to": "experiments/s6/results/out_v6"
+  },
+  {
+    "from": "experiments/s6/changes_code_20261004.diff",
+    "to": "experiments/s6/archive/changes_code_20261004.diff"
+  },
+  {
+    "from": "experiments/s6/originals_before_20261004.zip",
+    "to": "experiments/s6/archive/originals_before_20261004.zip"
+  },
+  {
+    "from": "experiments/s7/out_s6check",
+    "to": "experiments/s7/results/out_s6check"
+  },
+  {
+    "from": "experiments/s7/out_small",
+    "to": "experiments/s7/results/out_small"
+  },
+  {
+    "from": "experiments/s7/out_small60",
+    "to": "experiments/s7/results/out_small60"
+  },
+  {
+    "from": "experiments/s7/out_valid",
+    "to": "experiments/s7/results/out_valid"
+  },
+  {
+    "from": "experiments/s7/out_valid_b",
+    "to": "experiments/s7/results/out_valid_b"
+  },
+  {
+    "from": "experiments/s7/out_valid_c",
+    "to": "experiments/s7/results/out_valid_c"
+  },
+  {
+    "from": "experiments/s7/changes_code_20261005.diff",
+    "to": "experiments/s7/archive/changes_code_20261005.diff"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_creep.json",
+    "to": "experiments/s7/jobs/jobs_creep.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_s6check.json",
+    "to": "experiments/s7/jobs/jobs_s6check.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_small.json",
+    "to": "experiments/s7/jobs/jobs_small.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_small60.json",
+    "to": "experiments/s7/jobs/jobs_small60.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_valid.json",
+    "to": "experiments/s7/jobs/jobs_valid.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_valid_b.json",
+    "to": "experiments/s7/jobs/jobs_valid_b.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/jobs_valid_c.json",
+    "to": "experiments/s7/jobs/jobs_valid_c.json"
+  },
+  {
+    "from": "experiments/s7/_scratch/candidate",
+    "to": "experiments/s7/snapshots/candidate"
+  },
+  {
+    "from": "experiments/s6/_scratch",
+    "to": "experiments/s6/archive/scratch"
+  },
+  {
+    "from": "experiments/s7/_scratch",
+    "to": "experiments/s7/archive/scratch"
+  },
+  {
+    "from": "runs/bench_20261004T172740",
+    "to": "runs/archive/bench_20261004T172740"
+  },
+  {
+    "from": "runs/physics_smoke_20260923T152452",
+    "to": "runs/archive/physics_smoke_20260923T152452"
+  },
+  {
+    "from": "runs/station_demo_20260924T101544",
+    "to": "runs/archive/station_demo_20260924T101544"
+  },
+  {
+    "from": "runs/station_v2_demo_20260924T123322",
+    "to": "runs/archive/station_v2_demo_20260924T123322"
+  },
+  {
+    "from": "runs/transfer_sweep_20260930T095659",
+    "to": "runs/archive/transfer_sweep_20260930T095659"
+  },
+  {
+    "from": "runs/bench_stdout.txt",
+    "to": "runs/archive/bench_20261004T172740/stdout.txt"
+  }
+]

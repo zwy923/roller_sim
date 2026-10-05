@@ -1,0 +1,6962 @@
+[
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7001",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7001",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7001",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7001",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7001",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7001",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7001",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7001",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7002",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7002",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7002",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7002",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7002",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7002",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7002",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7002",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7003",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7003",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7003",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7003",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7003",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7003",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7003",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7003",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7004",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7004",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7004",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7004",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7004",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7004",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7004",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7004",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7004",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7005",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7005",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7005",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7005",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7005",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7005",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7005",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7005",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7006",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7006",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7006",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7006",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7006",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7006",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7006",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7006",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7006",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7007",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7007",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7007",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7007",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7007",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7007",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7007",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7007",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7007",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7008",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7008",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7008",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7008",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7008",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7008",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7008",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7008",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7008",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7009",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7009",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7009",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7009",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7009",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7009",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7009",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7009",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7009",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7010",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7010",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7010",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7010",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7010",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7010",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7010",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7010",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7010",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7011",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7011",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7011",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7011",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7011",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7011",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7011",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7011",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7012",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7012",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7012",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7012",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7012",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7012",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7012",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7012",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7012",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7013",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7013",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7013",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7013",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7013",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7013",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7013",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7013",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7013",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7014",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7014",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7014",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7014",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7014",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7014",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7014",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7014",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7014",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7015",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7015",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7015",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7015",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7015",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7015",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7015",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7015",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7015",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7016",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7016",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7016",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7016",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7016",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7016",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7016",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7016",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7016",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7017",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7017",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7017",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7017",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7017",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7017",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7017",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7017",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7017",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7018",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7018",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7018",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7018",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7018",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7018",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7018",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7018",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7018",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7019",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7019",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7019",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7019",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7019",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7019",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7019",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7019",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7019",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7020",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7020",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7020",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7020",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7020",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7020",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7020",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7020",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7020",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7021",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7021",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7021",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7021",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7021",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7021",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7021",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7021",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7021",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7022",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7022",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7022",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7022",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7022",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7022",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7022",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7022",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7022",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7023",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7023",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7023",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7023",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7023",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7023",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7023",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7023",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7023",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7024",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7024",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7024",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7024",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7024",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7024",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7024",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7024",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7024",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7025",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7025",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7025",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7025",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7025",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7025",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7025",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7025",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7025",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7026",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7026",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7026",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7026",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7026",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7026",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7026",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7026",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7026",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7027",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7027",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7027",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7027",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7027",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7027",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7027",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7027",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7027",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7028",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7028",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7028",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7028",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7028",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7028",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7028",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7028",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7028",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7029",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7029",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7029",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7029",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7029",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7029",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7029",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7029",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7029",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "scatter_7030",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "scatter_7030",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "aligned_7030",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "aligned_7030",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "touching_7030",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "touching_7030",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu30",
+"tag": "oblique_7030",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".30"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "proto_a_mu60",
+"tag": "oblique_7030",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7030",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow",
+"--face-kind",
+"plate",
+"--lane-w",
+".58",
+"--friction-steel",
+".60"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+}
+]

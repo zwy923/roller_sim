@@ -1,0 +1,17 @@
+# 环境与缓存
+.venv/
+__pycache__/
+*.pyc
+.claude/
+
+# 运行产物：数据不进 git（需要长期保存的结果另行备份）
+runs/*
+!runs/README.md
+experiments/*/results/
+experiments/*/archive/scratch/
+output/
+
+# 大文件
+*.tar
+*.mp4
+*.npz

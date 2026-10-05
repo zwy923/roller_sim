@@ -1,0 +1,14 @@
+# 现行源码与文档：仓库内统一 LF（provenance 的源码哈希按文件字节算，换行不统一会让同一份代码得到不同哈希）
+* text=auto eol=lf
+
+# 历史记录原样保存，不做换行转换：快照的 source_sha 要能按原字节复算
+experiments/*/snapshots/** -text
+experiments/*/jobs/** -text
+experiments/*/archive/** -text
+archive/** -text
+runs/archive/** -text
+
+*.zip binary
+*.gz binary
+*.png binary
+*.pdf binary

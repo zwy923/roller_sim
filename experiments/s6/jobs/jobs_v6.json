@@ -1,0 +1,313 @@
+[
+{
+"config": "drum_head_v6",
+"tag": "aligned_7011",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7011",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--feeder-head-d",
+".25",
+"--feeder-tail-d",
+".20",
+"--feeder-handover",
+".23",
+"--feeder-gap",
+"1.03"
+],
+"set": {
+"singulator.perception.SPLIT_PAD": null
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "scatter_7001",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "aligned_7001",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "touching_7001",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "oblique_7001",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7001",
+"--count",
+"5",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "scatter_7002",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "aligned_7002",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "touching_7002",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "oblique_7002",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7002",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "scatter_7003",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "aligned_7003",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "touching_7003",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "final_v6",
+"tag": "oblique_7003",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7003",
+"--count",
+"4",
+"--duration",
+"200",
+"--no-video"
+],
+"root": "../snapshots/candidate3"
+},
+{
+"config": "robust_v6",
+"tag": "scatter_7005",
+"argv": [
+"--layout",
+"scatter",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "robust_v6",
+"tag": "aligned_7005",
+"argv": [
+"--layout",
+"aligned",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "robust_v6",
+"tag": "touching_7005",
+"argv": [
+"--layout",
+"touching",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+},
+{
+"config": "robust_v6",
+"tag": "oblique_7005",
+"argv": [
+"--layout",
+"oblique",
+"--seed",
+"7005",
+"--count",
+"3",
+"--duration",
+"200",
+"--no-video",
+"--weigh-stop",
+"centre",
+"--buffer-approach",
+"slow"
+],
+"set": {
+"singulator.station.WEIGH_MAX_S": 5.0
+},
+"root": "../snapshots/candidate3"
+}
+]
