@@ -8,6 +8,11 @@ FONT = Path(r'C:\Windows\Fonts\msyh.ttc')      # the overlay's Chinese font; wit
 
 FACE_PHASE_ZH = dict(idle='常位', out='撤离中', hold='撤离保持', back='复位中', fault='犁面运动故障')
 FEEDER_PHASE_ZH = dict(feeding='放料', stopped='停（等放下的料进直道）', empty='已放空')
+STAGE_ZH = dict(buffer='缓冲', transfer='上计量带', onm='在计量带上', measure='称重+测体积', decided='等排料板',
+                discharge='排出', hold='作废停住')
+PLATE_ZH = dict(closed='落板（煤）', opening='抬起中', open='抬起（矸）', closing='回落中')
+REASON_ZH = dict(multi='多块', handover='交接未确认', outside='搭秤外', unsteady='读数不稳', scan='扫描无效',
+                 implausible='密度不合理', tare='秤未清空', track_lost='跟踪丢失')
 
 
 class Recorder:
@@ -72,4 +77,28 @@ def overlay(cfg, t, n_tail, n_total, together_s, belt_f, face, feeder, station):
     went = feeder.lumps_went if feeder.vision else feeder.released
     lines.append(('给料带：%s  第 %d 次放料  已放 %d/%d 块' % (state, len(feeder.releases), len(went), n_total),
                   False, (30, 90, 70) if feeder.phase == 'feeding' else (90, 90, 100)))
-    return lines + station.status_lines()
+    return lines + station_lines(station)
+
+
+def station_lines(s):
+    """The station's states, and the last measured item."""
+    where = lambda st: ' '.join('#%d%s' % (it['item'] + 1, STAGE_ZH.get(it['stage'], it['stage']))
+                                for it in s.line if it['stage'] in st) or '空'
+    flags = ('（停，等计量带）' if s.b_goal == 0. and not s.frozen else '') + \
+            ('  （上游暂停）' if s.section_held and not s.frozen else '') + \
+            ('  【全线暂停：%s】' % (s.alarm['why'] if s.alarm else '视觉') if s.frozen else '')
+    lines = [('缓冲带：%s  计量带：%s  排料板：%s %.0f°%s'
+              % (where(('buffer',)), where(('transfer', 'onm', 'measure', 'decided', 'discharge', 'hold')),
+                 PLATE_ZH.get(s.plate, s.plate), s.plate_deg, flags), False, (60, 45, 110))]
+    done = [it for it in s.items if 't_decided_s' in it]
+    if done:
+        it = done[-1]
+        lines.append(('第 %d 件：称得 %.1f kg  体积 %s  密度 %s → %s'
+                      % (it['item'] + 1, it['mass_kg'],
+                         '%.1f L' % (1000 * it['volume_m3']) if it.get('volume_m3') else '无效',
+                         '%.0f kg/m³' % it['density_kg_m3'] if it.get('density_kg_m3') else '—',
+                         '作废停住（%s）' % '、'.join(REASON_ZH[r] for r in it['reasons']) if it['void']
+                         else ('矸石' if it['route'] == 'gangue' else '煤')),
+                      False, (170, 40, 40) if it['void'] else (120, 70, 30) if it.get('route') == 'gangue'
+                      else (40, 40, 45)))
+    return lines

@@ -18,6 +18,20 @@ from .layouts import lay_flat
 PARK_GAP = 1.3        # m: lumps taken off lie this far apart on the floor, upstream of the machine
 
 
+def items_gone(station, lumps):
+    """The station's items that leave the line when `lumps` are taken off it: every held item, and an item
+    crossing onto M whose every lump went with them. Left in place, such an item stood on M for ever and M never
+    stopped for the next one, which rode to M's head and was held 'outside' (lane 0.58 m trial, aligned 6006,
+    2026-10-01). Which lumps an item holds is the truth: the simulation's hand knows what it took."""
+    gone = set(lumps)
+    out = []
+    for it in station.line:
+        truth = {k for o in it['objs'] for k in o['_truth']}
+        if it['stage'] == 'hold' or (it['stage'] in ('transfer', 'onm') and truth and truth <= gone):
+            out.append(it)
+    return out
+
+
 class TakeOff:
     """Takes a held item off the line the moment the station holds it (see the module docstring)."""
 
@@ -43,7 +57,7 @@ class TakeOff:
             L.state = 'taken_off'
             self.log.append(dict(t_s=round(t, 3), lump=k, items=[it['item'] for it in held]))
         sensors.vision.taken_off(t, ks)
-        station.took_off(t, sorted(ks))
+        station.took_off(t, items_gone(station, ks), sorted(ks))
 
 
 class Scenario:

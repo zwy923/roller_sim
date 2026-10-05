@@ -45,7 +45,9 @@ from singulator.lumps import make_blocks, set_mass_properties  # noqa: E402
 from singulator.machine import assembly, sensors, separator, station as hw  # noqa: E402
 from singulator.physics.lumps import Lump  # noqa: E402
 from singulator.sensing import beams, vision  # noqa: E402
-from singulator.sensing.weigher import weigher_reading  # noqa: E402
+from singulator.sensing import weigher as scale  # noqa: E402
+from singulator.sim.scenarios import items_gone  # noqa: E402
+from singulator.verify.station import StationWitness, frame_contacts  # noqa: E402
 
 CFG = parse_config(['--no-video', '--weigh-model', 'steady'])    # Control drives the indicator; see Baseline
 D = machine.derive(CFG)
@@ -228,18 +230,19 @@ class Weighing(unittest.TestCase):
         d.qpos[L.q + 2] += TOP + .002 - low                            # 2 mm above the measuring belt
         belts = [(m.jnt_qposadr[m.joint(j).id], m.jnt_dofadr[m.joint(j).id])
                  for j in ('mfloorj', 'feederj', 'bbeltj', 'mbeltj')]
-        weigher = assembly.weigh_frame(m)
-        self.assertEqual(weigher, {g for g in range(m.ngeom) if m.body(m.geom_bodyid[g]).name == 'mbelt'
-                                   or m.geom(g).name.startswith('mskirt')})      # M and its skirts
+        frame = assembly.weigh_frame(m)
+        self.assertEqual(frame, {g for g in range(m.ngeom) if m.body(m.geom_bodyid[g]).name == 'mbelt'
+                                 or m.geom(g).name.startswith('mskirt')})        # M and its skirts
+        cell = scale.LoadCell(m, frame, {L.geom: 0})
         loads = []
         for i in range(int(2. / m.opt.timestep)):
             for q, v in belts:                                        # every belt held at rest
                 d.qpos[q], d.qvel[v] = 0., 0.
             mujoco.mj_step(m, d)
             if i * m.opt.timestep > 1.:
-                loads.append(weigher_reading(m, d, weigher, {L.geom: 0}, load_only=True))
-        Fz, on, other = weigher_reading(m, d, weigher, {L.geom: 0})
-        self.assertLess(abs(np.mean(loads) / station.G - blocks[0]['mass_kg']) / blocks[0]['mass_kg'], .005)
+                loads.append(cell.force(d))
+        on, other = frame_contacts(d, frame, {L.geom: 0})
+        self.assertLess(abs(np.mean(loads) / scale.G - blocks[0]['mass_kg']) / blocks[0]['mass_kg'], .005)
         self.assertEqual(on, {0})
         self.assertFalse(other.get(0, set()))                         # touches nothing off the weigh frame
 
@@ -288,25 +291,43 @@ class Tracker(unittest.TestCase):
 # ---- control on synthetic sensor signals --------------------------------------------------------------
 class Line:
     """Synthetic sensors for the station controller: every box (8 corners) is a lump and one camera object
-    (tid = its index) unless told otherwise; the beams are sensing.beams.Beam line tests on the boxes; the scanner
-    answers self.verdict; the load cell reads `load` (N)."""
+    (tid = its index) unless told otherwise; the beams are sensing.beams.Beam line tests on the boxes; the weigher
+    is the configured device (--weigh-model) on a load cell that reads `load` (N); this object stands in for the
+    volume device and answers self.verdict scan_s after the belt came to rest. A witness holds the truth the
+    harness states (which lumps are on the scale, where they landed)."""
 
     def __init__(self, densities=(1300., 2500., 1350.), cfg=CFG, d=D):
         self.blocks = [dict(mass_kg=50., volume_m3=50. / rho, density=rho, material='coal' if rho < 1800 else 'gangue')
                        for rho in densities]
-        self.n = len(self.blocks)
-        self.s = station.Station(cfg, d, self.blocks)
+        self.n, self.cfg = len(self.blocks), cfg
+        self.weigher = scale.make_weigher(cfg)
+        self.s = station.Station(cfg, d, self.weigher, self, margin=3 * vision.POS_SIGMA)
+        self.witness = StationWitness(cfg, self.blocks).attach(self.s)
         self.beams = {b['name']: beams.Beam(b['name'], b['x'], b['z'], b['max_block_s'], oracle=True)
                       for b in d['devices']['beams']}
         self.t, self.verdict, self.scans = 0., dict(valid=True, reasons=[]), 0
         self.on_m = None
 
-    def scan(self, t):
+    # ---- the volume device (the interface of sensing.volume.Scanner) ----
+    def read(self, t, rest):
+        if t < rest + self.cfg['scan_s'] - 1e-9:
+            return None
         self.scans += 1
         v = dict(self.verdict)
         if v['valid']:
             v['volume_m3'] = self.blocks[self.on_m]['volume_m3']
         return v
+
+    def describe(self):
+        return dict(volume='the harness')
+
+    def report(self):
+        """The station's report with the verification, as a run writes it."""
+        return self.witness.report(self.s.report())
+
+    def take_off(self, lumps):
+        """What sim.scenarios.TakeOff does to the station."""
+        self.s.took_off(self.t, items_gone(self.s, lumps), lumps)
 
     def see(self, boxes, load=None, plate=None, n_est=None, conf=None, health=True, states=None, bins=None,
             merge=None, on=(), lin=None):
@@ -335,10 +356,10 @@ class Line:
             b.sample(self.t, list(boxes.values()))
         s.u, s.b, s.m = s.u_goal, s.b_goal, s.m_goal                  # the drives follow their goals at once
         if load is not None and s.weighing:
-            s.load_step(load)
-        reading = (0. if load is None else load, set(on), {})
-        s.observe(self.t, view, self.beams, s.plate_deg if plate is None else plate, self.scan,
-                  audit=dict(reading=reading, states=states or ['on_belt'] * self.n, bins=bins or [None] * self.n))
+            self.weigher.load_step(load)
+        self.weigher.sample(0. if load is None else load)
+        self.witness.truth(states or ['on_belt'] * self.n, bins or [None] * self.n, set(on), {})
+        s.observe(self.t, view, self.beams, s.plate_deg if plate is None else plate)
 
     def run_to(self, k, x_front, boxes, step=.01, **kw):
         """Carry lump k (0.40 m long, lying on B / M) until its front reaches x_front, a sample per step."""
@@ -367,7 +388,7 @@ class Line:
             i += 1
             # unsteady: a slow 5 % swing (a lump still rocking) -- a sample-to-sample alternation the
             # indicator's 0.3 s average would smooth away
-            f = mass * station.G * (1. if steady else 1. + .05 * math.sin(2 * math.pi * i * .01 / .6))
+            f = mass * scale.G * (1. if steady else 1. + .05 * math.sin(2 * math.pi * i * .01 / .6))
             self.see(boxes, load=f, on=[k])
         return i
 
@@ -397,7 +418,7 @@ class Control(unittest.TestCase):
         del boxes[0]                                                    # slid off the plate, out of the zone
         L.see(boxes, states=['sorted', 'on_belt', 'on_belt'], bins=['coal', None, None])
         self.assertEqual((it['bins'], it['bins_match_route'], it['t_clear_s'] is not None), ({'0': 'coal'}, True, True))
-        self.assertEqual(s.report()['verification'], dict(s.report()['verification'], false_valid=[]))
+        self.assertEqual(L.report()['verification'], dict(L.report()['verification'], false_valid=[]))
 
     def held(self, it):
         """A held item: on M, no discharge, no plate move, no release."""
@@ -542,7 +563,7 @@ class Control(unittest.TestCase):
         self.assertEqual((it['reasons'], it['reason_info']['handover']['detail']), (['handover'], 'S2 saw nothing'))
         L.measure(boxes, it)
         self.held(it)
-        L.s.took_off(L.t, [0])                                         # take it off: the second hand-over ...
+        L.take_off([0])                                                # take it off: the second hand-over ...
         del boxes[0]
         it2 = L.onto_measuring_belt(boxes, k=1)
         self.assertEqual((L.beams['beam_in'].alarm or {}).get('why'), 'dead')   # ... two in a row: S2 is dead
@@ -556,7 +577,7 @@ class Control(unittest.TestCase):
         it = L.onto_measuring_belt(boxes)
         L.measure(boxes, it, steady=False)
         self.held(it)
-        s.took_off(L.t, [0])
+        L.take_off([0])
         del boxes[0]
         self.assertEqual((it['stage'], it['taken_off'], s.line), ('taken_off', [0], []))
         self.assertFalse(s.inhibit_release)
@@ -579,7 +600,7 @@ class Control(unittest.TestCase):
         L.see(boxes)
         it1 = s.items[-1]
         self.assertEqual(it1['stage'], 'transfer')
-        s.took_off(L.t, [0, 1])
+        L.take_off([0, 1])
         del boxes[0], boxes[1]
         self.assertEqual((it1['stage'], s.line), ('taken_off', []))
         L.see(boxes)
@@ -634,7 +655,7 @@ class Control(unittest.TestCase):
         boxes = {0: self.far(0), 1: self.far(1)}
         a = L.onto_measuring_belt(boxes)
         boxes[1] = box(EDGE - .30, EDGE + .10)
-        weigh = dict(load=50. * station.G, on=[0])
+        weigh = dict(load=50. * scale.G, on=[0])
         L.see(boxes, **weigh)
         L.run_to(1, STOP_X + .01, boxes, **weigh)                       # cuts the staging beam, M busy
         b = s.items[s.items.index(a) + 1]
@@ -649,7 +670,7 @@ class Control(unittest.TestCase):
         L, s = self.L, self.s
         boxes = {0: self.far(0), 1: self.far(1), 2: self.far(2)}
         a = L.onto_measuring_belt(boxes)
-        weigh = dict(load=50. * station.G, on=[0])
+        weigh = dict(load=50. * scale.G, on=[0])
         boxes[1] = box(EDGE - .30, EDGE + .10)
         L.see(boxes, **weigh)
         L.run_to(1, STOP_X + .01, boxes, **weigh)
@@ -754,7 +775,7 @@ class Rules(unittest.TestCase):
         s = L.s
         boxes = {0: box(EDGE - 3., EDGE - 2.6), 1: box(EDGE - 4., EDGE - 3.6)}
         a = L.onto_measuring_belt(boxes)
-        weigh = dict(load=50. * station.G, on=[0])
+        weigh = dict(load=50. * scale.G, on=[0])
         boxes[1] = box(EDGE - .30, EDGE + .10)
         L.see(boxes, **weigh)
         L.run_to(1, STOP_X + .01, boxes, **weigh)                       # cuts the staging beam, M busy
@@ -770,7 +791,7 @@ class Baseline(unittest.TestCase):
         cfg = parse_config(['--no-video'])
         self.assertEqual((cfg['sensing'], cfg['feeder_sensing'], cfg['weigh_model'], cfg['scan_s']),
                          ('vision', 'oracle', 'fixed', 1.))
-        self.assertEqual(station.Station(cfg, machine.derive(cfg), []).geometry()['measure']['weigh_model'], 'fixed')
+        self.assertEqual(Line(cfg=cfg, d=machine.derive(cfg)).s.geometry()['measure']['weigh_model'], 'fixed')
 
     def test_the_fixed_device_reads_after_scan_s_whatever_the_reading_does(self):
         cfg = parse_config(['--no-video'])

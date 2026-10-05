@@ -1,5 +1,7 @@
 """Control of the measuring and sorting station behind the lane: buffer belt B, measuring belt M, the separator
-plate (third version 2026-09-30). The hardware is machine/station.py; what weighs and scans is sensing/.
+plate (third version 2026-09-30). The hardware is machine/station.py. The two measuring devices on M are handed in:
+a weigher (sensing/weigher.py) and a volume device (sensing/volume.py); this controller stops an item for them,
+asks each for its result and decides on what they return.
 
     lane -> main belt head edge -> buffer belt (one step down) -> measuring belt (weigh + volume) -> flip separator
 
@@ -14,8 +16,9 @@ than the main belt and pull apart lumps that come over the head edge together.
 
 What it reads (--sensing vision): the camera objects of sensing.vision.Vision (estimated outline, extents,
 outline centroid, velocity, confidence, estimated lump count, track lineage), the beams S1-S4 as debounced
-signals, the load-cell reading, the scanner's verdict, the belt drives' own speed and the plate angle. The true
-state is used only to write the verification (keys starting with '_' / 'truth').
+signals, the weigher's result, the volume device's verdict, the belt drives' own speed and the plate angle. It
+never reads the true state. The verification of its decisions against the truth is written into its record by a
+witness (verify/station.py) that it calls at fixed points; without one (NoWitness) it runs the same.
 
 Items. An object whose outline centroid passes the head edge joins an item: the item of an object it
 descends from (track lineage), else the last item on B if it is closer than GROUP_GAP behind it, else a
@@ -30,11 +33,12 @@ Void = the measurement cannot stand for one lump. Reasons (all recorded, any one
                than a single lump can be;
   outside      while weighing, the item's outline is not inside the weigh zone with ISO_MARGIN, or another
                object is within ISO_GAP of it (it may lean on something off the scale);
-  unsteady     no steady reading within WEIGH_MAX_S (--weigh-model steady only; the default since 2026-10-05
-               is a device that reads scan_s after M came to rest, whatever the reading does);
-  scan         the scanner's verdict is not usable (failed, not one lump, not wholly in the zone, coverage);
+  unsteady     the weigher has a result but refuses it: no steady reading in time (--weigh-model steady only; the
+               default since 2026-10-05 is a device that reads scan_s after M came to rest, whatever the reading
+               does);
+  scan         the volume device's verdict is not usable (failed, not one lump, not wholly in the zone, coverage);
   implausible  measured density outside DENSITY_OK (a part of the weight carried elsewhere reads low);
-  tare         the empty-scale reading before this item was off by more than TARE_TOL (something left on M);
+  tare         the weigher says the scale was not clear before this item (something left on M);
   track_lost   the cameras lost the item's object on the way and found it again (identity not certain).
 An item found good waits at rest on M until the plate is in position for it. It is still watched (nothing else
 within ISO_GAP, one object of one lump): a lump that reaches it in that time makes it void after all (2026-10-04;
@@ -53,7 +57,8 @@ Control (as in the second version, now on the sensors):
   B  runs, except that it stops when its lead item is at S3 -- the beam blocked, or the cameras see its front
      STAGE_CAM past the line (then S3 is suspect) -- and M cannot take it;
   M  runs while empty, receiving or discharging; stops once an item is wholly on it (estimated rear
-     CLEAR + V_MARGIN past the joint) and the item before has left; at rest it weighs and scans;
+     CLEAR + the cameras' position margin past the joint) and the item before has left; at rest it is weighed
+     and scanned;
   two optional rules (2026-10-04; EXPERIMENTS.md S5 tried them as a patch, S6 as options; off by default):
      --weigh-stop centre: M carries an item that is wholly on it further, until the item is in the middle of the
         weigh zone (or its front is at the stop position: a long item stops as before). A round lump rocks after
@@ -70,9 +75,7 @@ and not found again) -- the line resumes once it is healthy again, and stops for
 a beam diagnosed dirty, dead or blocked too long, and a plate-path timeout -- the run stops there (no
 recovery modelled).
 
-Nothing here is calibrated: ideal load cells (sum of contact forces), ideal volume value, placeholder
-sensor noise; belts are held plates with a prescribed surface velocity. The sorting threshold, the density
-window and every tolerance are placeholders.
+Nothing here is calibrated: the sorting threshold, the density window and every tolerance are placeholders.
 """
 import math
 
@@ -83,11 +86,6 @@ from ..geom2d import box_gap
 from ..machine import sensors, station as hw
 from ..sensing import vision
 
-FILTER_S = .30        # s: the indicator's moving average of the load-cell samples ...
-STEADY_S = .50        # s: ... is steady when over this long it stays within ...
-STEADY_BAND = .01     # ... this fraction of its value (at least STEADY_MIN_N); 60 lumps on the second version all
-STEADY_MIN_N = 2.     # N: settled within 0.8 s this way, 5 never did under the old 2 % std rule (rocking contacts)
-WEIGH_MAX_S = 3.      # s: at rest this long without a steady reading: void (unsteady)
 STAGE_CAM = .03       # m: the cameras see the lead's front this far past S3 while S3 is clear: stop B anyway
 ACCEPT_AFTER = .30    # m: M takes the next item while discharging once the item on it has its rear this far on M
 APPROACH = .45        # m: --buffer-approach slow: B runs at M's speed while its lead's front is this close to the joint
@@ -101,18 +99,11 @@ JOG = .075            # jog speed / belt speed: 0.03 m/s at 0.40, the feed belt'
 PLATE_TOL_DEG = .5    # plate in position within this
 PLATE_FAULT = 3.      # plate not in position after this many swing times: fault, stop
 STALL_S = 20.         # s: a lump in hand and no station state change this long: stop the run
-G = 9.81
 # ---- void rules (placeholders, see the module docstring) ----
-V_MARGIN = .015       # m: position margin on camera-judged edges: 3 x the cameras' outline position noise
-                      # (sensing.vision.POS_SIGMA); 0 with the ideal view
 ISO_MARGIN = .02      # m: while weighing the item's outline keeps this far inside the weigh zone (x) ...
 ISO_GAP = .05         # m: ... and no other object comes this close to it
 DENSITY_OK = (1000., 3200.)   # kg/m3: a density outside this is not a lump weighed whole
-TARE_TOL = 20.        # N: the empty scale must read within this of zero (about 2 kg) ...
-ZERO_BAND = 3.        # N: ... it follows the empty reading only within this band (zero tracking), by 1/ZERO_N ...
-ZERO_N = 50           # ... per sample, and only with nothing within ZERO_CLEAR of the measuring belt
-ZERO_CLEAR = .10      # m
-ZERO_OFF_S = 1.       # s: the empty reading outside the band this long: the scale is not clear (tare fault)
+ZERO_CLEAR = .10      # m: the weigher tracks its zero only with nothing this close to the measuring belt
 HANDOVER_LEN = .70    # m: one S2 interruption over this much belt travel = more than one lump in a row (a
                       # single lump spans at most ~0.63 m in plan at the 0.50 m long-axis cap)
 HANDOVER_MIN = .05    # m: an S2 interruption over less belt travel than this is a touch or a bounce, not a lump
@@ -127,11 +118,27 @@ DEAD_AFTER = 2       # hand-overs (S2) or releases (S1) in a row without the bea
 ACROSS_IN = .10      # m: the cameras see a lump's body across a beam when the line is this far inside its outline
 
 
-STAGE_ZH = dict(buffer='缓冲', transfer='上计量带', onm='在计量带上', measure='称重+测体积', decided='等排料板',
-                discharge='排出', hold='作废停住')
-PLATE_ZH = dict(closed='落板（煤）', opening='抬起中', open='抬起（矸）', closing='回落中')
-REASON_ZH = dict(multi='多块', handover='交接未确认', outside='搭秤外', unsteady='读数不稳', scan='扫描无效',
-                 implausible='密度不合理', tare='秤未清空', track_lost='跟踪丢失')
+class NoWitness:
+    """Where the verification hooks go when nobody verifies. verify.station.StationWitness is the one that does;
+    it documents each hook."""
+
+    def seen(self, objs):
+        pass
+
+    def landed(self, t, sent):
+        pass
+
+    def at_rest(self, it):
+        pass
+
+    def decided(self, it):
+        pass
+
+    def routed(self, it):
+        pass
+
+    def revoked(self, it):
+        pass
 
 
 class Station:
@@ -139,12 +146,13 @@ class Station:
     the belt speed factors and moves plate_ref, the plate angle asked for (physics.drives.Conveyors and
     physics.actuators.PlateDrive follow them in a run)."""
 
-    def __init__(self, cfg, d, blocks):
-        self.cfg, self.d, self.g, self.blocks, self.n = cfg, d, d['station'], blocks, len(blocks)
-        self.vision = cfg['sensing'] == 'vision'
-        self.vm = V_MARGIN if self.vision else 0.
-        # the measuring device as a concept (--weigh-model fixed): mass and volume scan_s after M came to rest
-        self.fixed = cfg['weigh_model'] == 'fixed'
+    def __init__(self, cfg, d, weigher, scanner, margin=0.):
+        """weigher, scanner: the two measuring devices on M (the interfaces of sensing.weigher.Weigher and
+        sensing.volume.Scanner); margin: the position margin on the edges the cameras judge, m (the sensors'
+        own figure: sensing.suite.Sensors.margin; 0 on an ideal view)."""
+        self.cfg, self.d, self.g = cfg, d, d['station']
+        self.weigher, self.scanner, self.vm = weigher, scanner, margin
+        self.witness = NoWitness()                  # verify.station.StationWitness.attach() puts itself here
         c = self.sep = self.g['sep']
         self.rate = (c.open_deg - c.closed_deg) / cfg['separator_swing_s']      # plate, deg/s
         self.v, self.vb = cfg['station_speed'], cfg['buffer_speed']     # M, B
@@ -159,8 +167,6 @@ class Station:
         self.items, self.line, self.sent = [], [], []
         self.jog, self.fault, self.alarm = None, None, None
         self.hist = {}                              # (t, centroid x) per object, HANG_S long
-        self.samples, self.cell, self.tare, self.zero_off = [], 0., 0., 0.
-        self.load_sum, self.load_n = 0., 0          # per-step load while weighing, summed over one sample
         self.counts = dict(holds=0, section_holds=0, late=0, jogs=0, buffer_stops=0, plate_moves=0, discharge_early=0,
                            s3_by_camera=0, freezes=0, splits=0)
         self.events, self.held_s, self.buffer_stopped_s, self.frozen_s = [], 0., 0., 0.
@@ -168,19 +174,14 @@ class Station:
         self.frozen, self.frozen_since = False, None
         self.s2, self.b_odo, self.s2_missed = [], 0., 0   # S2 interruptions; buffer belt odometer; misses in a row
         self.objs = {}
-        self.taken = set()                          # verification: true lumps seen past the head edge
 
     def _stage(self, *stages):
         return [it for it in self.line if it['stage'] in stages]
 
     @property
     def weighing(self):
+        """An item is at rest on M (being measured, or held): the weigher is fed every physics step."""
         return bool(self._stage('measure', 'hold'))
-
-    def load_step(self, Fz):
-        """One physics step's load on M while weighing (averaged into the next sample)."""
-        self.load_sum += Fz
-        self.load_n += 1
 
     @property
     def section_held(self):
@@ -191,12 +192,6 @@ class Station:
     def inhibit_release(self):
         """The feed belt must not let another lump go: a void item is held, or an alarm stops the line."""
         return bool(self._stage('hold')) or self.frozen
-
-    def waiting(self, k, state, cx):
-        """Planned wait (stall bookkeeping only, verification side): a lump the station has taken, or any
-        lump upstream of the head edge while the station holds the section."""
-        return state == 'on_belt' and (k in self.taken or (self.section_held or self.u < 1.)
-                                       and cx <= self.g['buffer']['x0'])
 
     # ---- per physics step ------------------------------------------------------------------------
     def step(self, dt):
@@ -209,23 +204,18 @@ class Station:
         return self.u, self.b, self.m
 
     # ---- every camera sample ---------------------------------------------------------------------
-    def observe(self, t, view, beams, plate_deg, scanner, audit=None):
-        """view: perception frame {tid: object} (health in view.health); beams: {name: perception.Beam};
-        plate_deg: the plate encoder; scanner(t) -> the scanner's verdict on the measuring zone now;
-        audit: the true state, for the verification only (dict: reading=(Fz, on, other) of the weigh frame,
-        com={lump: centroid}, states, bins). The load cell's own reading is audit['reading'][0] (a sensor)."""
+    def observe(self, t, view, beams, plate_deg):
+        """One 10 ms sample. view: the cameras' frame {tid: object} (health in view.health); beams: {name:
+        sensing.beams.Beam}; plate_deg: the plate encoder. The weigher and the volume device have had their sample
+        (the run feeds them)."""
         g = self.g
-        self.plate_deg, self.audit = plate_deg, audit or {}
-        # the load cell: the mean of every physics step since the last sample while weighing, else this instant
-        self.cell = self.load_sum / self.load_n if self.load_n else self.audit.get('reading', (0.,))[0]
-        self.load_sum, self.load_n = 0., 0
+        self.plate_deg = plate_deg
         self.held_s += SAMPLE_S * self.section_held
         self.buffer_stopped_s += SAMPLE_S * (self.b_goal == 0.)
         self.frozen_s += SAMPLE_S * self.frozen
         x_e, x_j, m_end = g['buffer']['x0'], g['buffer']['x1'], g['measure']['x1']
         self.objs = objs = {tid: o for tid, o in view.items() if o['cx'] > x_e and o['x0'] < g['plate_zone'][1][0]}
-        for o in objs.values():
-            self.taken.update(o['_truth'])                # bookkeeping of planned waits only
+        self.witness.seen(objs)
         for tid, o in view.items():
             h = self.hist.setdefault(tid, [])
             h.append((t, o['cx']))
@@ -267,11 +257,9 @@ class Station:
                 # than the belt, or its lumps have drawn apart; seed 4014): stop now -- nothing leaves M unmeasured --
                 # and hold it
                 self._void(it, 'outside', detail='front at the measuring belt head before the item was on it')
-                it.update(stage='measure', t_stop_s=round(t, 3), tare_N=round(self.tare, 2))
-                self.samples = []
+                it.update(stage='measure', t_stop_s=round(t, 3), tare_N=self.weigher.begin())
             if it['stage'] == 'onm' and first and (not self.centre or centred or at_front):
-                it.update(stage='measure', t_stop_s=round(t, 3), tare_N=round(self.tare, 2))
-                self.samples = []
+                it.update(stage='measure', t_stop_s=round(t, 3), tare_N=self.weigher.begin())
             if it['stage'] == 'discharge' and x0 > m_end + hw.CLEAR:
                 it.update(stage='sent', t_off_s=round(t, 3))
         for it in [e for e in self.line if e['stage'] == 'sent']:
@@ -283,14 +271,14 @@ class Station:
         # ---- M: tare while empty, weigh and scan at rest -----------------------------------------------
         if not self.frozen and not any(on_m(e) for e in self.line) \
                 and not any(o['x1'] > x_j - ZERO_CLEAR and o['x0'] < m_end + ZERO_CLEAR for o in objs.values()):
-            self._zero()
+            self.weigher.track_zero()                         # M seen empty
         for it in self._stage('measure'):
-            self._measure(t, it, scanner)
+            self._measure(t, it)
         for it in self._stage('decided'):                     # found good, waiting for the plate: still watched
             self._isolation(it, zone=False)
             if it['reasons']:
                 it.update(void=True, revoked=dict(t_s=round(t, 3), route=it.pop('route')))
-                it.pop('route_as_ideal', None)
+                self.witness.revoked(it)
                 self._hold(t, it)
         # ---- plate: move the moment the route is known and the path is clear ---------------------------
         self._plate(t, path_clear)
@@ -511,29 +499,10 @@ class Station:
                                   route=it['route'], s4_interruptions=s4.blocks_since(it['t_discharge_s']),
                                   s4_blocked=s4.blocked, zone_occupied=occupied,
                                   note='the plate path was not confirmed clear: S4 alone does not prove it')
-        audit = self.audit
-        for it in self.sent:
-            lumps = it.get('truth_lumps', [])
-            if 't_landed_s' not in it and lumps and 'states' in audit and all(audit['states'][k] in ('sorted', 'dropped')
-                                                        for k in lumps):
-                bins = {str(k): audit['bins'][k] for k in lumps}
-                it.update(t_landed_s=round(t, 3), bins=bins,
-                          bins_match_route=all(b == it['route'] for b in bins.values()))
-                self._event(t, 'landed', item=it['item'], bins=bins)
+        self.witness.landed(t, self.sent)
         return all('t_clear_s' in it for it in self.sent)
 
     # ---- weighing and scanning -------------------------------------------------------------------
-    def _zero(self):
-        """M seen empty: zero tracking. The zero follows the reading only within ZERO_BAND of it; a reading
-        off the zero for ZERO_OFF_S means something lies on the scale (tare fault: the next item is void)."""
-        if abs(self.cell - self.tare) <= ZERO_BAND:
-            self.tare += (self.cell - self.tare) / ZERO_N
-            self.zero_off = 0.
-        else:
-            self.zero_off += SAMPLE_S
-            if self.zero_off >= ZERO_OFF_S - 1e-9:
-                self.tare, self.zero_off = self.cell, 0.       # re-zero there: the item will be void (tare)
-
     def _isolation(self, it, zone=True):
         """An item at rest on M, every sample: inside the weigh zone (zone: while it is weighed -- once its
         measurement stands, a lump that rocks back towards the joint is still the lump that was measured), nothing
@@ -550,54 +519,31 @@ class Station:
         if it['n_obj_max'] > 1 or it['n_est_max'] > 1:
             self._void(it, 'multi', detail='objects %d, estimated lumps %d' % (it['n_obj_max'], it['n_est_max']))
 
-    def _measure(self, t, it, scanner):
-        """Weigh (steady indicator) and scan (scan_s) at rest, together; the void checks all along."""
-        rest = it['t_stop_s'] + hw.RAMP_S                    # M at rest from here
+    def _measure(self, t, it):
+        """An item at rest on M: the void checks every sample, and the two devices asked for their results until
+        each has given one."""
+        rest = it['t_stop_s'] + hw.RAMP_S                 # M at rest from here
         if t < rest - 1e-9:
             return
         self._isolation(it)
-        if abs(it['tare_N']) > TARE_TOL:
+        if not self.weigher.zero_ok(it['tare_N']):
             self._void(it, 'tare', detail='empty reading %.1f N' % it['tare_N'])
-        # the truth, for the verification: what physically loads the weigh frame, and what else it touches
-        if 'reading' in self.audit:
-            _, on, other = self.audit['reading']
-            closure, stack = set(on), list(on)
-            while stack:                                  # lumps leaning on the lumps that load the frame
-                for x in other.get(stack.pop(), ()):
-                    if not isinstance(x, str) and x not in closure:
-                        closure.add(x)
-                        stack.append(x)
-            iso = closure <= set(on) and all('equipment' not in other.get(k, ()) for k in closure)
-            it['_on'] = it.get('_on', set()) | closure
-            it['truth_isolated'] = it.get('truth_isolated', True) and iso
+        self.witness.at_rest(it)
         if 'mass_kg' not in it:
-            self.samples.append(self.cell - it['tare_N'])
-            nf, ns = int(round(FILTER_S / SAMPLE_S)), int(round(STEADY_S / SAMPLE_S))
-            F = np.array(self.samples)
-            steady = False
-            if len(F) >= nf + ns - 1:
-                ma = np.convolve(F, np.ones(nf) / nf, 'valid')[-ns:]
-                steady = ma.max() - ma.min() <= max(STEADY_MIN_N, STEADY_BAND * abs(ma.mean()))
-            if self.fixed:
-                # the reading scan_s after M came to rest stands (the mean of its last STEADY_S); whether it was
-                # steady by the indicator's rule is recorded, not judged
-                if t >= rest + self.cfg['scan_s'] - 1e-9:
-                    win = F[-ns:]
-                    it.update(t_weigh_s=round(t, 3), weigh_wait_s=round(t - rest, 3), steady=bool(steady),
-                              mass_kg=round(float(win.mean()) / G, 3), reading_std_N=round(float(win.std()), 2))
-            elif steady or t - rest >= WEIGH_MAX_S - 1e-9:
-                win = F[-ns:]
-                it.update(t_weigh_s=round(t, 3), weigh_wait_s=round(t - rest, 3), steady=bool(steady),
-                          mass_kg=round(float(win.mean()) / G, 3), reading_std_N=round(float(win.std()), 2))
-                if not steady:
-                    self._void(it, 'unsteady')
-        if 'scan' not in it and t >= rest + self.cfg['scan_s'] - 1e-9:
-            res = scanner(t)
-            it['scan'] = {k: v for k, v in res.items() if not k.startswith('_')}
-            if not res['valid']:
-                self._void(it, 'scan', detail=','.join(res['reasons']))
-            else:
-                it['volume_m3'] = res['volume_m3']
+            got = self.weigher.read(t, rest, it['tare_N'])
+            if got is not None:
+                refused = got.pop('void', None)
+                it.update(got)
+                if refused:
+                    self._void(it, refused)
+        if 'scan' not in it:
+            res = self.scanner.read(t, rest)
+            if res is not None:
+                it['scan'] = res
+                if not res['valid']:
+                    self._void(it, 'scan', detail=','.join(res['reasons']))
+                else:
+                    it['volume_m3'] = res['volume_m3']
         if 'mass_kg' in it and 'scan' in it:
             self._decide(t, it)
 
@@ -605,14 +551,8 @@ class Station:
         thr = self.cfg['sort_density']
         vol = it.get('volume_m3')
         rho = it['mass_kg'] / vol if vol else float('nan')
-        lumps = sorted(it.pop('_on', set()))              # truth: the lumps on (or leaning on) the weigh frame
-        true = sum(self.blocks[k]['mass_kg'] for k in lumps)
-        it.update(t_decided_s=round(t, 3), density_kg_m3=round(rho, 1) if math.isfinite(rho) else None,
-                  truth_lumps=lumps, truth_single=len(lumps) == 1, truth_mass_kg=round(true, 3),
-                  mass_error_pct=round(100. * (it['mass_kg'] - true) / true, 3) if true else None,
-                  truth_density_kg_m3=[round(self.blocks[k]['density'], 1) for k in lumps],
-                  material=[self.blocks[k]['material'] for k in lumps],
-                  ideal_route=['gangue' if self.blocks[k]['density'] >= thr else 'coal' for k in lumps])
+        it.update(t_decided_s=round(t, 3), density_kg_m3=round(rho, 1) if math.isfinite(rho) else None)
+        self.witness.decided(it)
         if math.isfinite(rho) and not DENSITY_OK[0] <= rho <= DENSITY_OK[1]:
             self._void(it, 'implausible', detail='%.0f kg/m3' % rho)
         it['void'] = bool(it['reasons'])
@@ -620,7 +560,7 @@ class Station:
             self._hold(t, it)
             return
         it.update(stage='decided', route='gangue' if rho >= thr else 'coal')
-        it['route_as_ideal'] = all(r == it['route'] for r in it['ideal_route'])
+        self.witness.routed(it)
         self._event(t, 'decided', item=it['item'], mass_kg=it['mass_kg'], volume_m3=it['volume_m3'],
                     density_kg_m3=it['density_kg_m3'], route=it['route'])
 
@@ -629,19 +569,15 @@ class Station:
         self.counts['holds'] += 1
         self._event(t, 'hold', item=it['item'], reasons=list(it['reasons']))
 
-    # ---- the simulation takes a held item off the line (line.TakeOff) -----------------------------------
-    def took_off(self, t, lumps):
-        """The held item's lumps (and anything else on M, straddling the joint included) are off the line: the
-        stop is over. An item crossing onto M whose every lump went with them goes too: left in place it stood
-        on M for ever and M never stopped for the next item, which rode to M's head and was held 'outside'
-        (lane 0.58 m trial, aligned 6006, 2026-10-01)."""
-        gone = set(lumps)
-        for it in list(self.line):
-            truth = {k for o in it['objs'] for k in o['_truth']}
-            if it['stage'] == 'hold' or (it['stage'] in ('transfer', 'onm') and truth and truth <= gone):
-                self.line.remove(it)
-                it.update(stage='taken_off', t_taken_off_s=round(t, 3), taken_off=list(lumps))
-        self.tare, self.zero_off = 0., 0.                     # M cleaned: the scale is clear again
+    # ---- items taken off the line by hand ---------------------------------------------------------------
+    def took_off(self, t, items, lumps):
+        """Someone has taken these items off the line -- the held ones, and with them whatever else lay on M
+        (the simulation's stand-in for that is sim.scenarios.TakeOff, which also says which items those are). The
+        stop is over; M was cleaned, so the scale is clear again. lumps: what was removed, for the record."""
+        for it in items:
+            self.line.remove(it)
+            it.update(stage='taken_off', t_taken_off_s=round(t, 3), taken_off=list(lumps))
+        self.weigher.clear()
         self._event(t, 'taken_off', lumps=list(lumps))
 
     # ---- alarms ------------------------------------------------------------------------------------
@@ -765,16 +701,13 @@ class Station:
                               not_cleared=[it['item'] for it in self.sent if 't_clear_s' not in it])
 
     def geometry(self):
-        """The station for result.json: the hardware (machine.station.report) with what the measuring device and
-        this controller add to it -- how M weighs and scans, and the void rules."""
+        """The station for result.json: the hardware (machine.station.report) with what the two measuring devices
+        and this controller add to it -- how M weighs and scans, and the void rules."""
         g = hw.report(self.g)
-        measure = dict(g['measure'], weigh_model=self.cfg['weigh_model'], filter_s=FILTER_S, steady_s=STEADY_S,
-                       steady_band=STEADY_BAND, max_wait_s=WEIGH_MAX_S, skirts_on_weigh_frame=True,
-                       volume='true hull volume (ideal value); usability judged by the scanner model')
+        measure = dict(g['measure'], **self.weigher.describe(), **self.scanner.describe())
         return dict(g, measure=measure,
                     void_rules=dict(density_ok_kg_m3=list(DENSITY_OK), iso_margin_m=ISO_MARGIN, iso_gap_m=ISO_GAP,
-                                    tare_tol_N=TARE_TOL, handover_len_m=HANDOVER_LEN, weigh_max_s=WEIGH_MAX_S,
-                                    path_timeout_s=PATH_TIMEOUT_S,
+                                    handover_len_m=HANDOVER_LEN, path_timeout_s=PATH_TIMEOUT_S, **self.weigher.limits(),
                                     on_void='hold: no discharge, no plate move, no release; the simulation then takes '
                                             'the lumps off the line (manual re-measuring is not modelled)'))
 
@@ -782,64 +715,23 @@ class Station:
         self.events.append(dict(t_s=round(t, 3), event=event, **info))
 
     # ---- output ----------------------------------------------------------------------------------
-    def status_lines(self):
-        """Video overlay: station states, and the last measured item."""
-        where = lambda st: ' '.join('#%d%s' % (it['item'] + 1, STAGE_ZH.get(it['stage'], it['stage']))
-                                    for it in self.line if it['stage'] in st) or '空'
-        flags = ('（停，等计量带）' if self.b_goal == 0. and not self.frozen else '') + \
-                ('  （上游暂停）' if self.section_held and not self.frozen else '') + \
-                ('  【全线暂停：%s】' % (self.alarm['why'] if self.alarm else '视觉') if self.frozen else '')
-        lines = [('缓冲带：%s  计量带：%s  排料板：%s %.0f°%s'
-                  % (where(('buffer',)), where(('transfer', 'onm', 'measure', 'decided', 'discharge', 'hold')),
-                     PLATE_ZH.get(self.plate, self.plate), self.plate_deg, flags), False, (60, 45, 110))]
-        done = [it for it in self.items if 't_decided_s' in it]
-        if done:
-            it = done[-1]
-            lines.append(('第 %d 件：称得 %.1f kg  体积 %s  密度 %s → %s'
-                          % (it['item'] + 1, it['mass_kg'],
-                             '%.1f L' % (1000 * it['volume_m3']) if it.get('volume_m3') else '无效',
-                             '%.0f kg/m³' % it['density_kg_m3'] if it.get('density_kg_m3') else '—',
-                             '作废停住（%s）' % '、'.join(REASON_ZH[r] for r in it['reasons']) if it['void']
-                             else ('矸石' if it['route'] == 'gangue' else '煤')),
-                          False, (170, 40, 40) if it['void'] else (120, 70, 30) if it.get('route') == 'gangue'
-                          else (40, 40, 45)))
-        return lines
-
     def report(self):
+        """The station's record for result.json. (A witness adds the verification: verify.station.)"""
         done = [it for it in self.items if 't_decided_s' in it]
         valid = [it for it in done if not it['void']]
         clean = lambda it: {k: (sorted(v) if isinstance(v, (set, frozenset)) else v) for k, v in it.items()
                             if k not in ('objs', 'now', 'tids')}
-        # verification: a valid item must be one true lump, weighed alone, within 2 % (true state); and no lump may
-        # land in a bin without such an item (sorted unmeasured)
-        measured = {k for it in valid if it.get('truth_single') and 't_discharge_s' in it for k in it['truth_lumps']}
-        states, bins = self.audit.get('states') or [], self.audit.get('bins') or []
-        unmeasured = [k for k, st in enumerate(states) if st == 'sorted' and k not in measured]
-        false_valid = [it['item'] for it in valid if not it['truth_single'] or not it.get('truth_isolated', True)
-                       or it['mass_error_pct'] is None or abs(it['mass_error_pct']) > 2.]
-        false_void = [it['item'] for it in done if it['void'] and it['truth_single'] and it.get('truth_isolated', True)
-                      and it.get('mass_error_pct') is not None and abs(it['mass_error_pct']) <= 2.
-                      and 'scan' not in it['reasons']]
         reasons = {}
         for it in done:
             for r in it['reasons']:
                 reasons[r] = reasons.get(r, 0) + 1
+        w = self.weigher.describe()
         return dict(geometry=self.geometry(), items=[clean(it) for it in self.items], events=self.events,
                     counts=dict(self.counts, items=len(self.items), measured=len(done), valid=len(valid),
                                 void=len(done) - len(valid), void_reasons=reasons,
                                 gangue=sum(it.get('route') == 'gangue' for it in valid),
                                 coal=sum(it.get('route') == 'coal' for it in valid),
-                                route_not_as_ideal=sum(not it['route_as_ideal'] for it in valid),
-                                bins_not_as_route=sum(it.get('bins_match_route') is False for it in self.items),
-                                landed=sum('t_landed_s' in it for it in self.items),
                                 void_discharged=sum(it['void'] and 't_discharge_s' in it for it in done)),
-                    verification=dict(false_valid=false_valid, false_void=false_void, landed_unmeasured=unmeasured,
-                                      rule='valid = one true lump, touching nothing off the weigh frame, weighed '
-                                           'within 2 %; false_void excludes scan failures (a scan can fail on a '
-                                           'good lump); landed_unmeasured = lumps in a bin without a valid '
-                                           'single-lump item discharged'),
-                    mass_error_pct_abs_max=max((abs(it['mass_error_pct']) for it in valid
-                                                if it['mass_error_pct'] is not None), default=None),
                     upstream_held_s=round(self.held_s, 2), buffer_stopped_s=round(self.buffer_stopped_s, 2),
                     frozen_s=round(self.frozen_s, 2), fault=self.fault,
                     s2_interruptions=[{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e.items()} for e in self.s2],
@@ -853,5 +745,5 @@ class Station:
                             'scans (%.1f s) at the same time; route = gangue if mass/volume >= %.0f kg/m3; the plate '
                             'moves as soon as the route is known and S4 plus the plate-zone camera say its path is '
                             'clear; the discharge starts once the plate will be in position %.1f s before the lump '
-                            'reaches it' % (FILTER_S, 100 * STEADY_BAND, STEADY_S, self.cfg['scan_s'],
+                            'reaches it' % (w['filter_s'], 100 * w['steady_band'], w['steady_s'], self.cfg['scan_s'],
                                             self.cfg['sort_density'], PLATE_MARGIN_S))

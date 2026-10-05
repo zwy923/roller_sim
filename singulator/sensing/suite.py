@@ -1,17 +1,20 @@
-"""The sensors of the line as one set: the cameras, the four beams and the volume scanner, fed with the scene
-every 10 ms.
+"""The sensors of the line as one set: the cameras, the four beams, the volume scanner and the weigher, fed with
+the scene.
 
-This is where the true state becomes sensor signals: Sensors.frame() hands the lumps' true outlines to the models
-(vision.py, beams.py, volume.py) and returns what the controllers get. Injected faults (--fault: scan_fail:N,
-beam_dirty:NAME@T, beam_dead:NAME@T, vision_off:T0-T1) act here, on the sensors.
+This is where the true state becomes sensor signals: Sensors.frame() hands the lumps' true outlines and the load on
+the weigh frame to the models (vision.py, beams.py, volume.py, weigher.py) every 10 ms; what the controllers get is
+its return value (the cameras' objects) and the attributes beams, scanner, weigher and feed_view. Injected faults
+(--fault: scan_fail:N, beam_dirty:NAME@T, beam_dead:NAME@T, vision_off:T0-T1) act here, on the sensors.
 """
 import mujoco
 import numpy as np
 
+from ..machine.assembly import weigh_frame
 from ..physics.lumps import IN_LINE
 from .beams import Beam
 from .vision import Vision
 from .volume import Scanner
+from .weigher import LoadCell, make_weigher
 
 
 def parse_faults(cfg):
@@ -38,7 +41,15 @@ def parse_faults(cfg):
 
 
 class Sensors:
-    """Vision, the four beams and the scanner of the line."""
+    """Vision, the four beams, the scanner and the weigher of the line.
+
+        vision      the cameras (sensing.vision.Vision); frame(t) returns what the controllers see of them
+        feed_view   the feed belt controller's view: the same frame, or the ideal one (--feeder-sensing oracle)
+        beams       {name: sensing.beams.Beam}: beam_feed (S1), beam_in (S2), beam_stop (S3), beam_gangue (S4)
+        scanner     the volume device over the measuring belt (sensing.volume)
+        weigher     the weighing device of the measuring belt (sensing.weigher), on load_cell
+        margin      the position margin the controllers put on camera-judged edges
+    """
 
     def __init__(self, cfg, d, model, data, lumps, blocks):
         self.cfg, self.d, self.model, self.data, self.lumps, self.blocks = cfg, d, model, data, lumps, blocks
@@ -49,7 +60,11 @@ class Sensors:
                                         oracle=oracle)
         self.beams = {b['name']: Beam(b['name'], b['x'], b['z'], b['max_block_s'], oracle=oracle)
                       for b in dev['beams']}
-        self.scanner = Scanner(dev['scanner']['heads'], dev['scanner']['zone'], rng, oracle=oracle)
+        self.scanner = Scanner(dev['scanner']['heads'], dev['scanner']['zone'], rng, oracle=oracle,
+                               scan_s=cfg['scan_s'], look=self._under_scanner)
+        self.load_cell = LoadCell(model, weigh_frame(model), {L.geom: L.k for L in lumps})
+        self.weigher = make_weigher(cfg)
+        self.margin = self.vision.margin
         # the feed belt controller's own view (--feeder-sensing oracle): every lump's true centroid and outline,
         # while the station, the plough face and the alarms go on reading the cameras. It draws no noise
         self.ideal = (Vision(dev['cameras'], rng, exits=lambda x, y: False, oracle=True)
@@ -72,8 +87,15 @@ class Sensors:
                                                            self.lumps[b].geom, .05, self.fwd))
         return self._dist[key]
 
+    def step(self, weighing):
+        """Every physics step. weighing: the station has an item at rest on the measuring belt -- only then is the
+        load cell read at every step (it costs a pass over the contacts); otherwise once a sample, in frame()."""
+        if weighing:
+            self.weigher.load_step(self.load_cell.force(self.data))
+
     def frame(self, t):
-        """One 10 ms frame: faults due now, the scene, beams, vision. Returns the vision frame."""
+        """One 10 ms frame: faults due now, the scene, beams, vision, the weigher's sample. Returns the vision
+        frame."""
         self._dist = {}
         for f in self.faults:
             if f['kind'].startswith('beam_') and not f.get('done') and t >= f['t'] - 1e-9:
@@ -85,10 +107,11 @@ class Sensors:
         com = {L.k: self.data.xipos[L.body].copy() for L in self.lumps if L.state in IN_LINE}
         fr = self.vision.frame(t, self.scene, self.dist, com)
         self.feed_view = self.ideal.frame(t, self.scene, self.dist, com) if self.ideal else fr
+        self.weigher.sample(self.load_cell.force(self.data))
         return fr
 
-    def scan(self, t):
-        """The scanner's verdict on the measuring zone now."""
+    def _under_scanner(self):
+        """What lies in the scanner's zone now (the true scene of the last frame), as Scanner.scan takes it."""
         (x0, y0, _), (x1, y1, _) = self.d['devices']['scanner']['zone']
         seen = {k: V for k, V in self.scene.items()
                 if V[:, 0].max() > x0 and V[:, 0].min() < x1 and V[:, 1].max() > y0 and V[:, 1].min() < y1
@@ -96,7 +119,7 @@ class Sensors:
         st = self.d['station']
         belt = ((st['measure']['x0'], st['y_c'] - st['width_m'] / 2 - .005),
                 (st['measure']['x1'], st['y_c'] + st['width_m'] / 2 + .005))
-        return self.scanner.scan(t, seen, lambda k: self.blocks[k]['volume_m3'], self.dist, belt)
+        return seen, (lambda k: self.blocks[k]['volume_m3']), self.dist, belt
 
     def report(self):
         return dict(sensing=self.cfg['sensing'],

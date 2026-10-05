@@ -7,8 +7,6 @@ a tail left the lane recently (the section is still emptying).
 """
 import numpy as np
 
-from . import station
-
 
 class SectionWatch:
     """Vision only: the singulation section (plough start - 0.3 m .. lane exit) as the cameras see it -- which
@@ -44,12 +42,12 @@ class SectionWatch:
         return section, stuck, passing
 
     @staticmethod
-    def plans(section):
-        """Outlines grown by the position margin, for the face's closing-sweep check."""
+    def plans(section, margin):
+        """Outlines grown by the cameras' position margin, for the face's closing-sweep check."""
         out = {}
         for tid, o in section.items():
             P = o['pts']
             c = P.mean(0)
             r = np.maximum(np.linalg.norm(P - c, axis=1, keepdims=True), 1e-9)
-            out[tid] = P + (P - c) / r * station.V_MARGIN
+            out[tid] = P + (P - c) / r * margin
         return out

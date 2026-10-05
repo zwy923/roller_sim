@@ -1,9 +1,17 @@
-"""The volume scanner over the measuring belt: the volume, and whether the scan is usable.
+"""The volume measurement on the measuring belt: the volume, and whether the scan is usable.
 
-Three depth heads (machine/sensors.py). The volume it returns is still the ideal hull volume; what is modelled is
-the verdict: exactly one object in the zone, wholly on the belt, seen by two heads, and a top surface one convex
-lump could have -- two touching lumps leave a valley under the roof of their common hull deeper than SCAN_DEFECT.
-The lumps are convex, which flatters the valley test: real coal is not.
+What the station asks of a volume device:
+
+    read(t, rest)   one sample of an item at rest since `rest`: None until the device has its verdict, then -- once
+                    -- dict(valid, reasons, volume_m3, ...): valid False = the measurement cannot stand for one lump
+    describe()      for result.json
+
+Scanner is the placeholder device: three depth heads (machine/sensors.py) that deliver their verdict scan_s after
+the belt came to rest. The volume it returns is still the ideal hull volume; what is modelled is the verdict:
+exactly one object in the zone, wholly on the belt, seen by two heads, and a top surface one convex lump could have
+-- two touching lumps leave a valley under the roof of their common hull deeper than SCAN_DEFECT. The lumps are
+convex, which flatters the valley test: real coal is not. The volume detection that is being developed takes its
+place by implementing read() and describe() (docs/ARCHITECTURE.md).
 """
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -34,10 +42,24 @@ def top_surface(V, X, Y):
 class Scanner:
     """The volume scanner over the measuring belt: the volume, and whether the scan is usable."""
 
-    def __init__(self, heads, zone, rng, oracle=False):
+    def __init__(self, heads, zone, rng, oracle=False, scan_s=1., look=None):
+        """heads, zone: machine.sensors.layout()['scanner']; rng: the noise stream; scan_s: how long a scan takes
+        from the belt at rest; look() -> (lumps, volume, dist, belt): what lies under the scanner now, as scan()
+        takes it (the true scene: sensing.suite.Sensors supplies it)."""
         self.heads, self.zone, self.rng, self.oracle = heads, zone, rng, oracle
+        self.scan_s, self.look = scan_s, look
         self.fail_on = set()                                 # injected: these scans (0, 1, ...) fail
         self.scans = []
+
+    def read(self, t, rest):
+        """The device as the station uses it: the verdict, scan_s after the belt came to rest."""
+        if t < rest + self.scan_s - 1e-9:
+            return None
+        res = self.scan(t, *self.look())
+        return {k: v for k, v in res.items() if not k.startswith('_')}
+
+    def describe(self):
+        return dict(volume='true hull volume (ideal value); usability judged by the scanner model')
 
     def scan(self, t, lumps, volume, dist, belt):
         """lumps: {k: world vertices} of every lump reaching into the scan zone (the scene); volume(k): true

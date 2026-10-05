@@ -32,13 +32,13 @@ from ..control.jam import SectionWatch
 from ..control.station import Station
 from ..lumps import batch_material_summary, make_blocks, set_mass_properties
 from ..machine import derive
-from ..machine.assembly import CATS, build_xml, categorise, weigh_frame
+from ..machine.assembly import CATS, build_xml, categorise
 from ..physics.actuators import FaceServo, PlateDrive
 from ..physics.drives import Conveyors
 from ..physics.lumps import Lump, lane_discharging, stalled
 from ..physics.numerics import Diagnostics
 from ..sensing.suite import Sensors
-from ..sensing.weigher import weigher_reading
+from ..verify.station import StationWitness, frame_contacts
 from ..verify.transfer import TransferWatch
 from .layouts import arrange, plan_scatter
 from .scenarios import Scenario, TakeOff
@@ -109,16 +109,16 @@ def _run(cfg, save):
         lumps[k].place(data, x, y, z, yaw)
     belts = Conveyors(cfg, d, model)
     belts.command(data)                        # place every slat before the first contact evaluation
-    station = Station(cfg, d, blocks)
     plate = PlateDrive(model, d['station']['sep'])
     plate.place(data)                          # separator plate down (coal), linkage closed
-    load_cells = weigh_frame(model)            # the geoms the load cells carry
     mujoco.mj_forward(model, data)
     watch = None
     vision = cfg['sensing'] == 'vision'
     scenario = Scenario(cfg, d, model, data, lumps, blocks)
     scenario.setup()                           # touching: two lumps laid touching in the lane
     sensors = Sensors(cfg, d, model, data, lumps, blocks)
+    station = Station(cfg, d, sensors.weigher, sensors.scanner, sensors.margin)
+    witness = StationWitness(cfg, blocks).attach(station)      # the station's record against the truth
     takeoff = TakeOff(d, model, data, lumps)
     layout = arrange(cfg, d, model, data, lumps, rng)     # a bench layout; scatter / flat: as placed
     transfer = TransferWatch(cfg, d, model, lumps)
@@ -152,7 +152,7 @@ def _run(cfg, save):
         station."""
         if feeder.waiting(L.k, L.state, L.last_pose[0]):
             return 'feeder'
-        if station.waiting(L.k, L.state, L.last_pose[0]):
+        if witness.waiting(L.k, L.state, L.last_pose[0]):
             return 'station'
         return False
 
@@ -173,8 +173,7 @@ def _run(cfg, save):
             break
         face.record(t)
         belts.after_step(data, t, dt)
-        if station.weighing:
-            station.load_step(weigher_reading(model, data, load_cells, geom_lump, load_only=True))
+        sensors.step(station.weighing)
         if (step + 1) % stride and step + 1 < n_steps:
             continue
 
@@ -224,15 +223,15 @@ def _run(cfg, save):
             v_section, v_stuck, v_passing = watch.update(
                 t, frame, lambda o: station.section_held and o['cx'] <= d['station']['buffer']['x0'])
             face.zone_busy = bool(v_section)
-            face.check_sweep(SectionWatch.plans(v_section))
+            face.check_sweep(SectionWatch.plans(v_section, sensors.margin))
         else:
             face.zone_busy = bool(in_section)
             face.check_sweep({L.k: L.plan for L in lumps if L.state == 'on_belt'})
         face_N = _face_force(model, data, cat)
         face.contact(face_N, dt_sample)
-        reading = weigher_reading(model, data, load_cells, geom_lump)
-        station.observe(t, frame, sensors.beams, plate.angle(data), sensors.scan,
-                        audit=dict(reading=reading, states=[L.state for L in lumps], bins=[L.bin for L in lumps]))
+        witness.truth([L.state for L in lumps], [L.bin for L in lumps],
+                      *frame_contacts(data, sensors.load_cell.frame, geom_lump))
+        station.observe(t, frame, sensors.beams, plate.angle(data))
         takeoff.act(t, station, sensors)
         scenario.act(t, station)
         if station.section_held or station.inhibit_release:
@@ -258,7 +257,7 @@ def _run(cfg, save):
         traj['face_deg'].append(math.degrees(face.theta))
         traj['face_contact_N'].append(face_N)
         traj['drive_f'].append(belts.factors())
-        traj['weigh_N'].append(station.cell)
+        traj['weigh_N'].append(sensors.weigher.reading)
         traj['sep_deg'].append(station.plate_deg)
 
         # ---- stall -> retract, or stop for the operator ---------------------------------------------
@@ -318,7 +317,7 @@ def _run(cfg, save):
     out['outcome']['stop_model'] = 'run terminates on alarm; no post-alarm braking/coasting simulation'
     out['feeder'] = feeder.report()
     out['transfer'] = dict(transfer.report(feeder), layout=layout)
-    out['station'] = station.report()
+    out['station'] = witness.report(station.report())
     out['perception'] = sensors.report()
     out['taken_off'] = takeoff.log
     out['scenario'] = dict(kind=cfg['scenario'], **scenario.info)

@@ -118,6 +118,12 @@ class Vision:
         self.latest = Frame()
         self.latest.t, self.latest.health = 0., dict(ok=True, why=None)
 
+    @property
+    def margin(self):
+        """m: the position margin a controller puts on an edge these cameras judge: 3 x the outline position noise
+        (none on the ideal view)."""
+        return 0. if self.oracle else 3 * POS_SIGMA
+
     def dark(self, t):
         return any(t0 <= t < t1 for t0, t1 in self.outage)
 
