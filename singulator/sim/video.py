@@ -4,7 +4,10 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-FONT = Path(r'C:\Windows\Fonts\msyh.ttc')      # the overlay's Chinese font; without it the default font is used
+# the overlay's Chinese font, the first that exists (Windows, then Linux); without one the default font is used
+FONTS = (Path(r'C:\Windows\Fonts\msyh.ttc'), Path('/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'),
+         Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'))
+FONT = next((p for p in FONTS if p.exists()), FONTS[0])
 
 FACE_PHASE_ZH = dict(idle='常位', out='撤离中', hold='撤离保持', back='复位中', fault='犁面运动故障')
 FEEDER_PHASE_ZH = dict(feeding='放料', stopped='停（等放下的料进直道）', empty='已放空')

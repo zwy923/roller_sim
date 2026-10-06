@@ -161,4 +161,11 @@ python experiments/s7/s7_analyze.py runs/accept --list
 python experiments/s7/s7_feed.py runs/accept --config proposed
 ```
 
+改法二仍然一次放下多块的两个例子（并齐 7231：停带后被翻下的头一块带过边；相贴 7213：质心齐平）可以渲染成特写视频：
+
+```bash
+MUJOCO_GL=glfw xvfb-run -a python experiments/s8/s8_video.py --layout aligned --seed 7231 --count 4 --duration 20 --out runs/s8_video/aligned_7231
+MUJOCO_GL=glfw xvfb-run -a python experiments/s8/s8_video.py --layout touching --seed 7213 --count 4 --duration 20 --out runs/s8_video/touching_7213
+```
+
 `s8_jobs.py` 的配置把给料头的规则写明（`--feeder-stop`、`EARLY_BEAM_CREEP`），默认值以后再改也照样复现。本节的批当时是用默认 `beam` 的代码加 `--set control.feeder.STOP_PAST=.003` 等跑的；`--feeder-stop` 这个参数是之后才加的，加完后在 6 批上核对过：两种写法逐项相同。原始结果在 `runs/`，不进 git。
