@@ -85,7 +85,7 @@
 - **比较时排除的字段**：`config` 里已删除的选项和新增的 `set`、`geometry.skew_deg`，以及两处提到旧模块名的说明文字（`provenance.limitations`、`geometry.devices.note`）。
 - **有意的行为变化只有一处**：`--sensing oracle` 下的停滞判断并到了默认路径的同一套规则（`SectionWatch` 读理想视图）。试了一例 oracle 模式下发生停滞的批次，撤离时刻和停线时刻与重构前相同；这只是一例，不保证所有情况相同。默认路径（`--sensing vision`）不受影响。
 - **没有验证的**：Windows 上的运行——验证在 Linux 上做，重构前同一种子在两个平台上的结果本来就有差异（种子 392 清线时刻 44.33 s 对 44.15 s），所以"等价"只在同一平台内成立；被删除的选项对应的旧结果，新代码无法复现，要用重构前的代码（git 标签 `before-refactor`）。视频渲染只跑通过一次（0.3 s，无中文字体）。
-- 自检：`python checks/run_all.py --full`。在本机验收重构：用同样的种子重跑 S7（约 20 分钟），再用 `s7_compare.py` 和保存的结果逐批比对，命令见 [experiments/README.md](../experiments/README.md)；预期逐批相同。
+- 自检：`python checks/run_all.py --full`。在本机验收重构：用同样的种子重跑 S7（约 20 分钟），再用 `experiments/diff.py` 和保存的结果逐批比对，命令见 [experiments/README.md](../experiments/README.md)；预期逐批相同。
 
 ## 还没解决的结构问题
 

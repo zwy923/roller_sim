@@ -19,7 +19,7 @@ QUICK = [['checks/architecture_checks.py'],
          ['checks/physics_regression_checks.py'],
          ['checks/feeder_regression_checks.py'],
          ['checks/flip_separator_checks.py'],
-         ['experiments/s7/s7_analyze_checks.py'],
+         ['experiments/analyze_checks.py'],
          ['checks/station_checks.py'] + STATION_QUICK,
          ['checks/plough_checks.py']]
 FULL = [['checks/station_checks.py', 'Acceptance']]

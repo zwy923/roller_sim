@@ -1,9 +1,9 @@
-"""Baseline and the feed head changes side by side, on the batches every configuration ran (S8): pure Python.
+"""Configurations side by side, on the batches every one of them ran (S8 on, 2026-10-06): pure Python.
 
-    python experiments/s8/s8_compare.py OUT_DIR [OUT_DIR ...] [--configs baseline,stop_past] [--seeds FIRST-LAST]
-                                        [--list]
+    python experiments/compare.py OUT_DIR [OUT_DIR ...] [--configs beam_stop,baseline] [--seeds FIRST-LAST]
+                                  [--list]
 
-Reads <config>/<tag>.result.json.gz (experiments/s7/s7_run.py) and audits every batch with singulator.audit. Only the
+Reads <config>/<tag>.result.json.gz (experiments/run.py) and audits every batch with singulator.audit. Only the
 tags that every listed configuration has a result for are compared (paired: same batch, same lumps, same layout).
 
   measured        lumps measured alone / lumps put in (the S7 measure; 95 % interval resampling batches);
@@ -27,7 +27,7 @@ import sys
 from collections import Counter, OrderedDict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from singulator.audit import BAD_END, audit  # noqa: E402
 
 LEVEL_S = .10

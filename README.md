@@ -10,7 +10,7 @@
 - 排料板独立模型：[designs/flip_separator/README.md](designs/flip_separator/README.md)。
 - 给料机头小试（真实滚筒、交接间距、台架方案）：[designs/transfer_trial/DESIGN.md](designs/transfer_trial/DESIGN.md)。
 - 当前实验结论见 [EXPERIMENTS.md](docs/EXPERIMENTS.md)，完整表格和历史过程由总览链接到各阶段记录；本文和 `designs/` 只讲结构、控制和用法。
-- 实验文件入口：[experiments/README.md](experiments/README.md)。当前验证用 S7；S6 保留历史结果及共用跑批工具。
+- 实验脚本：[experiments/README.md](experiments/README.md)（跑批、审计、配对比较、回放，都在这一个目录）。
 
 > 2026-09-30 起只有这一条线（用户：删主线，把完整结构当主线）。原主线（挡料门、斜置辊床、3× 卸料带）、给料带单独试验线、它们的实验记录和回放台都已删除；删除前的整个项目打包在上一级目录 `roller_sim_backup_20260930_before_single_line.zip`。
 > 所有数字只用于同一模型内的结构比较，不是实物发生率、产率或选型依据。
@@ -49,13 +49,12 @@ python checks/architecture_checks.py                      # 包的分层：依�
 python checks/timestep_checks.py                          # 同来料三档步长；不等同于实物标定
 python designs/transfer_trial/sweep.py                    # 小试：机头几何 × 布料矩阵
 python plough.py --set control.station.APPROACH=.65       # 临时改一个模块常量（可重复；python -m singulator.tuning 列出全部）
-python experiments/s7/s7_jobs.py --seeds 7101-7160 --out runs/s7_jobs.json            # 基线批量：四种布料 × 种子
-python experiments/s7/s7_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10   # 多进程跑，中断后同一条命令续跑
-python experiments/s7/s7_analyze.py runs/s7 --list                                    # 逐块审计：独立测量成功率、失败原因
-python experiments/s7/s7_compare.py experiments/s7/results/out_valid_b/baseline runs/s7/baseline   # 同一批任务跑两遍：逐批逐项是否相同
-python experiments/s7/s7_analyze_checks.py                                            # 逐块审计的自检（不跑物理）
-python experiments/s8/s8_jobs.py --seeds 7201-7260 --configs baseline,proposed --out runs/s8.json   # 旧线对新线
-python experiments/s8/s8_compare.py runs/s8 --configs baseline,proposed --list                      # 同批配对比较
+python experiments/jobs.py --seeds 7201-7260 --configs beam_stop,baseline --out runs/jobs.json   # 批量清单：配置 × 四种布料 × 种子
+python experiments/run.py --jobs runs/jobs.json --out runs/batch --workers 10   # 多进程跑，中断后同一条命令续跑
+python experiments/analyze.py runs/batch --list                                 # 逐块审计：独立测量成功率、失败原因
+python experiments/compare.py runs/batch --configs beam_stop,baseline --list    # 同批配对比较
+python experiments/diff.py runs/batch/baseline runs/batch_again/baseline        # 同一批任务跑两遍：逐批逐项是否相同
+python experiments/analyze_checks.py                                            # 逐块审计的自检（不跑物理）
 ```
 
 每次运行在 `runs/<名字>_<时间>/` 下保存：
@@ -63,7 +62,7 @@ python experiments/s8/s8_compare.py runs/s8 --configs baseline,proposed --list  
 - `trajectory.npz`：每 10 ms 一帧，各块位姿（pos + quat）、质心、前缘、接触类别位掩码、犁面角、犁面接触法向力、各驱动速度系数、称重读数、排料板角度；配合 `model.xml` 可精确重建每块料；
 - `model.xml`；`video.mp4`：上半跟随斜视，下半正交俯视。
 
-`runs/` 放新运行和临时试跑，不进 git。正式批次的原始结果在 `experiments/s7/results/`（不进 git，只有本机这一份；压缩完整结果不包含轨迹与模型 XML）。运行方式见 [EXPERIMENTS.md](docs/EXPERIMENTS.md)。
+`runs/` 放新运行和临时试跑，不进 git。要长期留的批次结果放 `experiments/results/`（不进 git，只有跑它的机器上有；压缩完整结果不包含轨迹与模型 XML）。运行方式见 [EXPERIMENTS.md](docs/EXPERIMENTS.md)。
 
 ## 当前结构
 
@@ -99,7 +98,7 @@ python experiments/s8/s8_compare.py runs/s8 --configs baseline,proposed --list  
 2026-10-06 基线（S8；上面几条仍然成立）：
 - **按质心停带**（`--feeder-stop centroid`）：给料带不再慢走到料翻下去挡住 S1，头一块质心过机头 3 mm（`control.feeder.STOP_PAST`）就停，料自己翻；挂边的料每次点动 5 mm（`JOG_STEP`）、再等 0.5 s。S1 在这条路径上只做诊断。原规则留在 `--feeder-stop beam`。
 - **早挡慢走**（`control.feeder.EARLY_BEAM_CREEP`）：本次放料还没有质心过边光束就被挡，慢走到有质心过边再停，不再反复起停。
-- 第 S7 节的批次是 10-05 的线。用现在的代码复现要带 `--feeder-stop beam --set control.feeder.EARLY_BEAM_CREEP=0`。
+- 第 S7 节的批次是 10-05 的线。用现在的代码复现要带 `--feeder-stop beam --set control.feeder.EARLY_BEAM_CREEP=0`（`experiments/jobs.py` 的 `beam_stop`）。
 
 **撤离**：犁面整体绕折弯端铰点铰接，撤离 −25°，相机判卡触发。复位要同时满足：区段走空；没有任何料的整块轮廓伸进犁面回位要扫过的区域（留 10 mm）。复位过程中每 10 ms 重查，有料进入就停在原位、退回保持。20 s（`--face-hold-max-s`）内得不到复位许可就停线（`jammed` / `retract_hold_timeout`），不带料强收；开始复位后 6 s 未到位记 `face_fault`。
 
@@ -171,7 +170,7 @@ requirements.txt       Python 依赖；本地环境在 .venv/
 docs/                  项目说明与实验结论
   ARCHITECTURE.md      代码分层、数据流、替换计量装置的方法、2026-10-05 删掉的选项
   EXPERIMENTS.md       当前实验结论、明细导航和常用命令
-  history/             S1–S5 历史实验记录
+  history/             各轮实验的完整记录：S1–S5、S6、S7、S8
   TODO.md              有意推后的问题（2026-10-05 起）
   MATERIAL_MODEL.md    材料与密度模型
   REALISM_REVIEW.md    现实性核查及边界
@@ -203,15 +202,11 @@ designs/
   station/             缓冲带、计量带、排料板与流程逻辑
   transfer_trial/      给料机头小试的台架方案（DESIGN.md）与仿真矩阵（sweep.py）
   flip_separator/      排料板独立模型（model.py：渲染、交互窗口、检查输出）
-experiments/
-  README.md            批量实验的入口与常用命令
-  s7/                  第 S7 节，基线的批量验证：s7_jobs.py（清单）、s7_run.py（多进程跑批、可续跑）、
-                       s7_compare.py（同一批跑两遍是否逐项相同）、s7_analyze.py（共用审计的批量报告）、
-                       s7_feed.py（给料机头每次放料）、s7_analyze_checks.py（审计自检）
-    REPORT.md          完整实验过程、结果表格与复现记录
-    results/           原始摘要和压缩完整结果，保留 out* 组名（不进 git）
-  s8/                  第 S8 节，给料机头一次放下多块：s8_jobs.py（基线与三种改法的清单）、s8_beam.py（回放轨迹，
-                       估计换停带规则的效果）、s8_compare.py（同批配对比较）；跑批和审计用 s7/ 的脚本
+experiments/           批量实验脚本（见 experiments/README.md）：jobs.py（任务清单）、run.py（多进程跑批、可续跑）、
+                       analyze.py（逐块审计的批量报告）、analyze_checks.py（审计自检）、compare.py（几个配置同批
+                       配对比较）、feed.py（给料机头每次放料）、replay.py（回放轨迹，估计换停带规则的效果）、
+                       diff.py（同一批跑两遍是否逐项相同）
+  results/             要长期留的批次结果，保留 out* 组名（不进 git）
 runs/                  新运行产物（不进 git）
 ```
 
@@ -228,7 +223,7 @@ runs/                  新运行产物（不进 git）
 只动代码结构，不改机器和控制规则：同一环境下重构前后逐位比对（`result.json` 与轨迹），结果见 [ARCHITECTURE.md](docs/ARCHITECTURE.md) 末尾。用的时候要知道的几件事：
 
 - **删掉的选项**（都是对照用的旧实现）：`--face-drive-model kinematic`、`--no-drive-limit`、`--face-shape straight` / `--skew-deg`、`--face-hinge upstream`、`--no-unjam`（改用 `--unjam-max 0`）、`--feed-band plough`、`--layout rows`、`--material-model legacy_binary`、`--blob-lead centroid`。带这些参数的旧命令会报"无此参数"；要复现当时的结果，用重构前的代码（下一条）。
-- **重构前的代码和资料在 git 标签 `before-refactor`**（提交 `77c8907`）：当时的源码，第 S6 节的全部脚本，S6 / S7 的四份源码快照（`experiments/*/snapshots/`）、已保存的任务清单（`jobs/`）、过程记录（`archive/`）和 10-05 的文件整理记录。原始结果不在 git 里：S7 的还在 `experiments/s7/results/`，S6 的已删除。2026-10-06 起这些不再放在工作目录里。要用：先提交手头的改动，`git checkout before-refactor`，按那一版自己的 README 运行（`.venv` 和 `results/` 不受切换影响），用完 `git checkout main` 回来。
+- **重构前的代码和资料在 git 标签 `before-refactor`**（提交 `77c8907`）：当时的源码，第 S6 节的全部脚本，S6 / S7 的四份源码快照（`experiments/*/snapshots/`）、已保存的任务清单（`jobs/`）、过程记录（`archive/`）和 10-05 的文件整理记录。原始结果不在 git 里：S7 的在 `experiments/results/`（原 `experiments/s7/results/`），S6 的已删除。2026-10-06 起这些不再放在工作目录里。要用：先提交手头的改动，`git checkout before-refactor`，按那一版自己的 README 运行（`.venv` 和 `results/` 不受切换影响），用完 `git checkout main` 回来。
 - **改模块常量**不再在任务文件里写 `singulator.station.X`，改用 `--set control.station.X=值`（任务文件的 `"set"` 同理）；`python -m singulator.tuning` 列出全部可改的常量及其所在模块。
 - **换称重 / 体积装置**：`sensing/weigher.py` 的 `Weigher`、`sensing/volume.py` 的 `Scanner` 是工位控制器用到的全部接口，换实现不用动控制器。
 

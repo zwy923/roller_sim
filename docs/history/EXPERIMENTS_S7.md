@@ -1,10 +1,10 @@
 # S7 基线验证：完整记录
 
-[实验总览](../../docs/EXPERIMENTS.md) · [任务、数据与源码索引](README.md) · [S6 历史记录](../../docs/history/EXPERIMENTS_S6.md)
+[实验总览](../EXPERIMENTS.md) · [实验脚本](../../experiments/README.md) · [S8 完整记录](EXPERIMENTS_S8.md) · [S6 历史记录](EXPERIMENTS_S6.md)
 
-本页保留 2026-10-05 的完整实验过程、表格和核对记录。文中的 `out*` 位于本目录 `results/`；命令从项目根目录运行。
+本页保留 2026-10-05 的完整实验过程、表格和核对记录。文中的 `out*` 位于 `experiments/results/`（不进 git）；命令从项目根目录运行。
 
-> 2026-10-06：文中提到的 `snapshots/`（源码快照）、`jobs/`（任务清单）、`archive/` 和第 S6 节的脚本已不在工作目录里，在 git 标签 `before-refactor` 上，取用方法见项目 [README](../../README.md#2026-10-05-结构重构)；跑批脚本现在是 `experiments/s7/s7_run.py`。第 S6 节的原始结果已删除。
+> 2026-10-06：文中提到的 `snapshots/`（源码快照）、`jobs/`（任务清单）、`archive/` 和第 S6 节的脚本已不在工作目录里，在 git 标签 `before-refactor` 上，取用方法见项目 [README](../../README.md#2026-10-05-结构重构)；本页原在 `experiments/s7/REPORT.md`；脚本都在 `experiments/`，去掉了 `s7_` 前缀（`s7_compare.py` 改叫 `diff.py`），S7 的线在 `jobs.py` 里叫 `beam_stop`。第 S6 节的原始结果已删除。
 
 ## S7. 基线能不能让每块料独立测量（579 批）
 
@@ -151,7 +151,7 @@
 ### 核对
 
 - **目录整理后的入口检查（10-05）**：正式任务清单迁到 `jobs/`，原始结果迁到 `results/`，源码迁到 `snapshots/`；结果与快照逐文件哈希不变。检查中补上 S7 报告入口遗漏的 `BAD_END` 导入，新增入口回归后 17 项通过；S6、S7 分析入口均在新位置运行通过，S7 仍为 932 / 949。
-- **独立重数**：只读每批的摘要（不读完整结果、不用 `s7_analyze.py`）另写脚本数了一遍，各目录的投入块数、独立测量成功块数、错误有效测量、未测落仓、停机次数与上面各表一致。
+- **独立重数**：只读每批的摘要（不读完整结果、不用 `analyze.py`）另写脚本数了一遍，各目录的投入块数、独立测量成功块数、错误有效测量、未测落仓、停机次数与上面各表一致。
 - **审计脚本自检**：S7 仿真阶段通过 13 项，用构造结果覆盖设计文档列的验收例（全部合格；出口并排但下游分开测成；出口单列却作废移走；全部拒收；无测量落仓、重复关联、错分、错仓；数值超限、没走完；字段缺失不算通过）。共用审计收尾时扩为 16 项，新增撤销记录、JSON / CLI 摘要和主指标与后续检查分离。
 - **共用审计收尾核对**：16 项自检全部通过；对 `out_valid_b`、`out_valid_c` 的 237 份完整结果逐份比较，迁移前后每块去向及全部批次标志完全相同，仍为 932 / 949。S7 仍读到全部 240 项任务，其中 3 项无结果。新增一次完整线运行（种子 392，5 块）为 5 / 5，保存的 `measurement_audit` 与重新计算相同，CLI 和 S7 均可读取；那次运行的输出（`runs/audit_finish_20261005T133008/`）2026-10-06 已随旧运行产物删除。本次只接入结果审计，历史记录中的 `f6794775` 仍指原仿真源码，不是收尾后源码的哈希。
 - **修正前后**：同 118 批重跑，112 批逐项相同（见第二步）。
@@ -161,11 +161,11 @@
 复现（Windows，项目根目录）：
 
 ```powershell
-python experiments/s7/s7_jobs.py --seeds 7101-7160 --out runs/s7_jobs.json
-python experiments/s7/s7_run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10
-python experiments/s7/s7_analyze.py runs/s7 --list
-python experiments/s7/s7_feed.py runs/s7
+python experiments/jobs.py --seeds 7101-7160 --configs beam_stop --out runs/s7_jobs.json
+python experiments/run.py --jobs runs/s7_jobs.json --out runs/s7 --workers 10
+python experiments/analyze.py runs/s7 --list
+python experiments/feed.py runs/s7 --config beam_stop
 ```
 
-原始结果在 `experiments/s7/results/`，任务及版本说明见 [S7 目录索引](README.md)。
+原始结果在 `experiments/results/`，各组的种子与源码版本见 [实验脚本](../../experiments/README.md#已保存的结果)。
 

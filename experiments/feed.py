@@ -1,6 +1,6 @@
-"""What the feed head did in the baseline batches (EXPERIMENTS.md S7): pure Python.
+"""What the feed head did in a batch run (S7 on, 2026-10-05): pure Python.
 
-    python experiments/s7/s7_feed.py OUT_DIR [OUT_DIR ...] [--config baseline]
+    python experiments/feed.py OUT_DIR [OUT_DIR ...] [--config baseline]
 
 Per release (one run of the feed belt): how many lumps went, how far apart in time their centroids passed the head
 edge, how long the first one took to cut the drop beam, and what became of the lumps that went together.
@@ -12,7 +12,7 @@ import json
 import os
 from collections import Counter
 
-from s7_analyze import audit, zh
+from analyze import audit, zh
 
 
 def q(v, p):

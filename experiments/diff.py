@@ -1,8 +1,8 @@
 """Were two runs of the same batches the same, batch by batch?
 
-    python experiments/s7/s7_compare.py DIR_A/CONFIG DIR_B/CONFIG
+    python experiments/diff.py DIR_A/CONFIG DIR_B/CONFIG
 
-Reads the batch summaries s7_run.py writes (<tag>.json) and compares, exactly, every field that says what happened in
+Reads the batch summaries run.py writes (<tag>.json) and compares, exactly, every field that says what happened in
 a batch (KEYS: the outcome, each item's judgement and times, each release, the counts) -- not the wall time, the
 arguments or the hash of the code. For the same job list on two versions of the code, or run twice on one machine.
 Different machines or library versions do not give the same batch (docs/TODO.md, section 7). Exit status 1 if any

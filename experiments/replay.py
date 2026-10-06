@@ -1,7 +1,7 @@
 """Replay saved runs at the feed head: when would another stop rule have stopped the feed belt, and would the second
-lump of a release have gone all the same? Pure post-processing of model.xml + trajectory.npz (s7_run.py --traj).
+lump of a release have gone all the same? Pure post-processing of model.xml + trajectory.npz (run.py --traj).
 
-    python experiments/s8/s8_beam.py RUN_DIR [RUN_DIR ...] [--beam X,Z ...] [--stop-past M ...]
+    python experiments/replay.py RUN_DIR [RUN_DIR ...] [--beam X,Z ...] [--stop-past M ...]
 
 RUN_DIR holds run folders (one per batch: result.json, model.xml, trajectory.npz), at any depth.
   --beam X,Z       a drop beam X m past the head edge, Z m above the main belt (the line: 0.10,0.05);

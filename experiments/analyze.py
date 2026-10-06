@@ -1,9 +1,9 @@
-"""Can the line measure every lump on its own? (EXPERIMENTS.md S7, 2026-10-05): pure Python.
+"""Can the line measure every lump on its own? The audit of a batch run (S7 on, 2026-10-05): pure Python.
 
-    python experiments/s7/s7_analyze.py OUT_DIR [OUT_DIR ...] [--only a,b] [--seeds FIRST-LAST] [--alias a=b ...]
-                                        [--list] [--json FILE]
+    python experiments/analyze.py OUT_DIR [OUT_DIR ...] [--only a,b] [--seeds FIRST-LAST] [--alias a=b ...]
+                                  [--list] [--json FILE]
 
-Reads what experiments/s7/s7_run.py writes: <config>/<tag>.json (a summary; only 'error' when the batch did not run)
+Reads what experiments/run.py writes: <config>/<tag>.json (a summary; only 'error' when the batch did not run)
 and <config>/<tag>.result.json.gz (the full result). The audit is imported from singulator.audit, also used by
 simulate.run and the single-run CLI. It is keyed by the true lump put on the feed belt, never by a camera's object number, and the true state
 is used to judge the result only.
@@ -42,7 +42,7 @@ import sys
 from pathlib import Path
 from collections import Counter, OrderedDict
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from singulator.audit import BAD_END, audit, void_cause  # one implementation for saved and live results
 
 LAYOUT_ZH = OrderedDict(scatter='随机', aligned='并齐', touching='相贴', oblique='斜放')

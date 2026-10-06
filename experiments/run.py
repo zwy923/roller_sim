@@ -1,19 +1,19 @@
 """Batch runner: a list of jobs through the model, one process per batch, resumable.
 
-    python experiments/s7/s7_run.py --jobs JOBS.json --out OUT_DIR [--workers N] [--root PROJECT_ROOT] [--match TEXT]
-                                    [--traj]
+    python experiments/run.py --jobs JOBS.json --out OUT_DIR [--workers N] [--root PROJECT_ROOT] [--match TEXT]
+                              [--traj]
 
 JOBS.json: [{"config": name, "tag": layout_seed, "argv": [plough.py arguments], "set": {"MODULE.NAME": value},
-"root": folder}, ...] (an experiment's *_jobs.py writes it).
+"root": folder}, ...] (jobs.py writes it).
   "set"   changes tunable constants for that job: the same as --set MODULE.NAME=VALUE in argv
           (singulator/tuning.py), e.g. {"control.station.APPROACH": 0.65};
   "root"  relative to JOBS.json, is the project folder that job runs -- another checkout of the code -- in place
           of PROJECT_ROOT.
 Each job is one batch through singulator.simulate.run in its own process. Per job it keeps, under OUT_DIR/<config>/:
-  <tag>.json            a compact summary (what the experiments' *_analyze.py read);
+  <tag>.json            a compact summary (what analyze.py reads);
   <tag>.result.json.gz  the full result.json of the run;
   <tag>/                with --traj only: result.json, model.xml and trajectory.npz as a single run writes them
-                        (about 0.5 MB a batch; experiments/s8/s8_beam.py replays them).
+                        (about 0.5 MB a batch; experiments/replay.py replays them).
 Finished jobs are skipped, so the same command resumes an interrupted sweep. A file named STOP in OUT_DIR ends the
 sweep after the jobs already running. Workers opt out of Windows power throttling (see _full_speed) and use
 single-threaded BLAS; a worker takes about 150 MB.
@@ -173,7 +173,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--jobs', required=True)
     p.add_argument('--out', required=True)
-    p.add_argument('--root', default=str(here.parents[2]), help='project folder that holds the singulator package')
+    p.add_argument('--root', default=str(here.parents[1]), help='project folder that holds the singulator package')
     p.add_argument('--workers', type=int, default=max(1, (os.cpu_count() or 2) - 4))
     p.add_argument('--match', default='', help='only jobs whose config/tag contains this text')
     p.add_argument('--traj', action='store_true', help='also keep each run\'s model.xml and trajectory.npz')

@@ -1,6 +1,8 @@
 # S8 给料机头一次放下多块：三种改法与新种子验收
 
-[实验总览](../../docs/EXPERIMENTS.md) · [S8 文件索引](README.md) · [S7 完整记录](../s7/REPORT.md) · [TODO](../../docs/TODO.md)
+[实验总览](../EXPERIMENTS.md) · [实验脚本](../../experiments/README.md) · [S7 完整记录](EXPERIMENTS_S7.md) · [TODO](../TODO.md)
+
+> 本页原在 `experiments/s8/REPORT.md`。之后脚本合并在 `experiments/`：`s8_jobs.py` → `jobs.py`、`s8_beam.py` → `replay.py`、`s8_compare.py` → `compare.py`，跑批和审计是 `run.py`、`analyze.py`、`feed.py`、`diff.py`（原 `s7_compare.py`）。配置也改了名：本页的 `baseline`（S7 的线）现在叫 `beam_stop`，`proposed` 现在叫 `baseline`。文中按新脚本名写，配置名保持当时的写法；末尾的复现命令按新名字写。
 
 2026-10-06。用户：修两处让统计不干净的模型问题（相贴布料生成重叠、数值筛查把落仓算进去），然后处理基线唯一的失败来源——给料机头一次放下多块（S7：866 次放料里 81 次，没测成的 17 块全部出自这里）。TODO.md 第 1 节列了三种改法，两种没试过，一种的试验被 S1 误报污染；要用没见过的新种子验收。
 
@@ -46,7 +48,7 @@ S7 的批跑在 Windows 上，原始结果不在这台机器上，而同一批�
 
 ## 三、回放：停带规则换了，第二块还会不会过边（不跑物理）
 
-`s8_beam.py` 读每批保存的轨迹。换一个停带规则（光束换位置，或质心过边几毫米就停），给料带停下之前的运动和原运行完全一样，所以新规则什么时候发停带命令是精确的；之后的事是估计：
+`replay.py` 读每批保存的轨迹。换一个停带规则（光束换位置，或质心过边几毫米就停），给料带停下之前的运动和原运行完全一样，所以新规则什么时候发停带命令是精确的；之后的事是估计：
 
 - 第二块在原运行里过边之前，给料带从头一块过边起走了多少（"需要的行程"，83 次的中位 12.6 mm）；新规则从头一块过边起只给多少（到停带命令的行程 + 从慢走刹停的 1.35 mm）。
 - 原运行里，从头一块过边到第二块过边，第二块的质心前进量和给料带行程一样（83 次里 80 次差 ≤ 5 mm，中位 0 mm）：**第二块是给料带送过去的，不是被头一块拖过去的**——在给料带一直走的情况下。给料带停了以后头一块翻下去会不会拖着它，回放看不出，要跑物理。
@@ -135,7 +137,7 @@ S7 的批跑在 Windows 上，原始结果不在这台机器上，而同一批�
 ## 核对
 
 - **两处模型修正不改变合法的批**：新旧代码同跑 8 批（种子 7101–7102 × 四种布料），`result.json` 除 `numerics`（以及输出路径、源码哈希）外逐项相同；布料修正在 4 × 2000 个种子上逐位核对过（见第一部分）。
-- **参数写法等价**：本节的批是用默认 `beam` 的代码加 `--set control.feeder.STOP_PAST=.003` 等跑的；`--feeder-stop` 加上后，新代码按 `s8_jobs.py` 的显式配置跑 6 批（基线、`proposed` 各 3 批，种子 7201），把默认改成 `centroid` 后再用默认参数跑 3 批（种子 7213，含一次质心齐平的失败），`s7_compare.py` 比对全部逐项相同。
+- **参数写法等价**：本节的批是用默认 `beam` 的代码加 `--set control.feeder.STOP_PAST=.003` 等跑的；`--feeder-stop` 加上后，新代码按 `jobs.py` 的显式配置跑 6 批（基线、`proposed` 各 3 批，种子 7201），把默认改成 `centroid` 后再用默认参数跑 3 批（种子 7213，含一次质心齐平的失败），`diff.py` 比对全部逐项相同。
 - **回放对得上原运行**：用原光束位置回放 240 批基线，801 次光束停带里 783 次和记录的停带时刻差 ≤ 15 ms；其余 18 次没有逐一查（回放用的是不去抖的几何判定加固定 30 ms）。
 - **自检**：`python checks/run_all.py --full` 全部通过（物理验收 6 项）。新加的：布料不重叠（10 个种子）、落地不算超限（构造模型）、按质心停带（4 项）、早挡慢走（2 项）。检查光束停带规则的旧用例显式带 `--feeder-stop beam`；种子 392 前 12 s 的物理集成按当前规则判。
 - **跑批没有出错**：1080 批全部有结果，没有异常退出。
@@ -146,19 +148,19 @@ S7 的批跑在 Windows 上，原始结果不在这台机器上，而同一批�
 
 ```bash
 # 基线对照组（保存轨迹给回放）
-python experiments/s8/s8_jobs.py --seeds 7101-7160 --configs baseline --out runs/s8_dev.json
-python experiments/s7/s7_run.py --jobs runs/s8_dev.json --out runs/dev --workers 4 --traj
-python experiments/s8/s8_beam.py runs/dev/baseline --beam .05,.08 --beam .10,.09 --stop-past .003
+python experiments/jobs.py --seeds 7101-7160 --configs beam_stop --out runs/s8_dev.json
+python experiments/run.py --jobs runs/s8_dev.json --out runs/dev --workers 4 --traj
+python experiments/replay.py runs/dev/beam_stop --beam .05,.08 --beam .10,.09 --stop-past .003
 # 小批：三种改法
-python experiments/s8/s8_jobs.py --seeds 7101-7130 --configs creep15,stop_past,beam_high --out runs/s8_pilot.json
-python experiments/s7/s7_run.py --jobs runs/s8_pilot.json --out runs/pilot --workers 4
-python experiments/s8/s8_compare.py runs/dev runs/pilot --configs baseline,creep15,stop_past,beam_high --seeds 7101-7130
+python experiments/jobs.py --seeds 7101-7130 --configs creep15,stop_past,beam_high --out runs/s8_pilot.json
+python experiments/run.py --jobs runs/s8_pilot.json --out runs/pilot --workers 4
+python experiments/compare.py runs/dev runs/pilot --configs beam_stop,creep15,stop_past,beam_high --seeds 7101-7130
 # 验收：新种子
-python experiments/s8/s8_jobs.py --seeds 7201-7260 --configs baseline,proposed --out runs/s8_accept.json
-python experiments/s7/s7_run.py --jobs runs/s8_accept.json --out runs/accept --workers 4
-python experiments/s8/s8_compare.py runs/accept --configs baseline,proposed --list
-python experiments/s7/s7_analyze.py runs/accept --list
-python experiments/s7/s7_feed.py runs/accept --config proposed
+python experiments/jobs.py --seeds 7201-7260 --configs beam_stop,baseline --out runs/s8_accept.json
+python experiments/run.py --jobs runs/s8_accept.json --out runs/accept --workers 4
+python experiments/compare.py runs/accept --configs beam_stop,baseline --list
+python experiments/analyze.py runs/accept --list
+python experiments/feed.py runs/accept --config baseline
 ```
 
 改法二仍然一次放下多块的两个例子（并齐 7231：停带后旁边那块被带过边；相贴 7213：质心齐平），用 `plough.py` 出视频回放即可（无显示器的 Linux 上前面加 `MUJOCO_GL=glfw xvfb-run -a`）：
@@ -168,4 +170,4 @@ python plough.py --layout aligned --seed 7231 --count 4
 python plough.py --layout touching --seed 7213 --count 4
 ```
 
-`s8_jobs.py` 的配置把给料头的规则写明（`--feeder-stop`、`EARLY_BEAM_CREEP`），默认值以后再改也照样复现。本节的批当时是用默认 `beam` 的代码加 `--set control.feeder.STOP_PAST=.003` 等跑的；`--feeder-stop` 这个参数是之后才加的，加完后在 6 批上核对过：两种写法逐项相同。原始结果在 `runs/`，不进 git。
+`jobs.py` 的配置把给料头的规则写明（`--feeder-stop`、`EARLY_BEAM_CREEP`），默认值以后再改也照样复现。本节的批当时是用默认 `beam` 的代码加 `--set control.feeder.STOP_PAST=.003` 等跑的；`--feeder-stop` 这个参数是之后才加的，加完后在 6 批上核对过：两种写法逐项相同。原始结果在 `runs/`，不进 git。

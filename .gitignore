@@ -7,7 +7,7 @@ __pycache__/
 # 运行产物：数据不进 git（需要长期保存的结果另行备份）
 runs/*
 !runs/README.md
-experiments/*/results/
+experiments/**/results/
 output/
 
 # 大文件

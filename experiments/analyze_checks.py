@@ -1,4 +1,4 @@
-"""Checks of the shared singulator.audit on made-up results (no simulation): python s7_analyze_checks.py
+"""Checks of the shared singulator.audit on made-up results (no simulation): python experiments/analyze_checks.py
 
 The cases are the ones designs/station/DESIGN.md asks of the whole-line acceptance: every lump good; abreast at the
 main belt head but measured one by one; single file but void and taken off; everything refused (safe, not a success);
@@ -14,8 +14,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-import s7_analyze
-from s7_analyze import audit, void_cause
+import analyze
+from analyze import audit, void_cause
 from singulator.audit import measurement_report, format_summary
 
 
@@ -195,8 +195,8 @@ class Audit(unittest.TestCase):
                 json.dump(r, fh)
             output = Path(tmp) / 'report.json'
             stdout = io.StringIO()
-            with patch('sys.argv', ['s7_analyze.py', tmp, '--list', '--json', str(output)]), redirect_stdout(stdout):
-                s7_analyze.main()
+            with patch('sys.argv', ['analyze.py', tmp, '--list', '--json', str(output)]), redirect_stdout(stdout):
+                analyze.main()
             self.assertIn('station_fault', stdout.getvalue())
             self.assertIn('100.0', stdout.getvalue())
             saved = json.loads(output.read_text(encoding='utf-8'))['baseline']['scatter_9001']

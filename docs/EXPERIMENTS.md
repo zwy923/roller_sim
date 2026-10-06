@@ -1,6 +1,6 @@
 # 实验总览
 
-更新：2026-10-06。当前只验证**固定基线能否让每块料独立测量**；结构扫描与节拍优化暂停。推后的问题见 [TODO](TODO.md)，文件位置见 [实验目录索引](../experiments/README.md)。
+更新：2026-10-06。当前只验证**固定基线能否让每块料独立测量**；结构扫描与节拍优化暂停。推后的问题见 [TODO](TODO.md)，脚本见 [experiments/](../experiments/README.md)。
 
 ## S8 给料机头按质心停带（当前基线）
 
@@ -20,7 +20,7 @@
 - 三种改法的小批（种子 7101–7130，各 120 批）：一次放下多块 43 次 → 慢走减半 21 次（慢 4.9 s）、按质心停带 10 次（慢 1.8 s）、光束抬高 30 次（另有 2 批 S1 长时遮挡停线）；光束"挪近机头"在回放里没有用。
 - **证据边界**：给料控制器读真实质心，判"过边 3 mm"没有误差；实物上相机形心误差 p95 约 2.6 cm，这条规则落地前要有毫米级的过边检测（TODO 第 1、3 节）。其余和 S7 相同：未标定模型、计量装置是概念装置。
 
-完整过程、表格和复现命令见 [S8 完整记录](../experiments/s8/REPORT.md)。
+完整过程、表格和复现命令见 [S8 完整记录](history/EXPERIMENTS_S8.md)。
 
 ## S7 基线与结果（2026-10-05，旧线）
 
@@ -46,12 +46,12 @@ S7 的线 = 现在的线加 `--feeder-stop beam --set control.feeder.EARLY_BEAM_
 
 | 记录 | 查什么 |
 |---|---|
-| [S8 完整记录](../experiments/s8/REPORT.md) | 两处模型修正、本机基线重跑、停带规则的回放、三种改法的小批、新种子验收、复现 |
-| [S7 完整记录](../experiments/s7/REPORT.md) | 小批定位、S1 误报修正、逐布料结果、9 次失败明细、核对与复现 |
+| [S8 完整记录](history/EXPERIMENTS_S8.md) | 两处模型修正、本机基线重跑、停带规则的回放、三种改法的小批、新种子验收、复现 |
+| [S7 完整记录](history/EXPERIMENTS_S7.md) | 小批定位、S1 误报修正、逐布料结果、9 次失败明细、核对与复现 |
 | [S6 历史记录](history/EXPERIMENTS_S6.md) | 相机给料与判稳配置下的控制、结构对比及样本外验证；候选组合未进入当前基线 |
 | [S1–S5 历史记录](history/EXPERIMENTS_S1-S5.md) | 计量段迭代、作废停住、机头小试、高差与缓冲带、出口宽度及圆料问题 |
 
-S8 的原始结果在运行它的机器的 `runs/` 下（不进 git）。S7 的原始结果在 `experiments/s7/results/`（不进 git），数据与版本说明见 [S7 索引](../experiments/s7/README.md)。S6 只留下记录，原始结果 2026-10-06 已删除。当时的脚本、源码快照和任务清单在 git 标签 `before-refactor` 上。早期记录的命令和结论按当时版本理解。
+S8 的原始结果在运行它的机器的 `runs/` 下（不进 git）。S7 的原始结果在 `experiments/results/`（不进 git），各组的种子与源码版本见 [实验脚本](../experiments/README.md#已保存的结果)。S6 只留下记录，原始结果 2026-10-06 已删除。当时的脚本、源码快照和任务清单在 git 标签 `before-refactor` 上。早期记录的命令和结论按当时版本理解。
 
 ## 常用入口
 
@@ -59,15 +59,15 @@ S8 的原始结果在运行它的机器的 `runs/` 下（不进 git）。S7 的�
 
 ```powershell
 # 读取现有 S7 结果，不重跑物理仿真
-python experiments/s7/s7_analyze.py experiments/s7/results/out_valid_b experiments/s7/results/out_valid_c --list
+python experiments/analyze.py experiments/results/out_valid_b experiments/results/out_valid_c --list
 
 # 单批运行；结果保存到 runs/
 python plough.py --seed 392 --count 5 --duration 150 --no-video
 
 # 共用审计回归
-python experiments/s7/s7_analyze_checks.py
+python experiments/analyze_checks.py
 ```
 
-普通结果优先看 `measurement_audit.counts`；错误标志看 `verification`，后续检查在 `later_checks`，批次总体状态在 `batch`。命令行与 S7 共用 `singulator/audit.py`；新跑批命令见 [实验目录索引](../experiments/README.md)。
+普通结果优先看 `measurement_audit.counts`；错误标志看 `verification`，后续检查在 `later_checks`，批次总体状态在 `batch`。单批命令行与 `experiments/analyze.py` 共用 `singulator/audit.py`；新跑批命令见 [实验脚本](../experiments/README.md)。
 
-新增试验把过程、完整表格和复现信息写入对应 `REPORT.md`；本页只更新当前基线、关键结论和明细链接。
+新增试验把过程、完整表格和复现信息写入 `docs/history/` 下这一轮的记录；本页只更新当前基线、关键结论和明细链接。
