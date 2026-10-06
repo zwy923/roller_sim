@@ -79,8 +79,6 @@ Nothing here is calibrated: the sorting threshold, the density window and every 
 """
 import math
 
-import numpy as np
-
 from ..config import SAMPLE_S
 from ..geom2d import box_gap
 from ..machine import sensors, station as hw
@@ -200,7 +198,8 @@ class Station:
         r = dt / hw.RAMP_S
         ramp = lambda x, goal: min(goal, x + r) if goal > x else max(goal, x - r)
         self.u, self.b, self.m = ramp(self.u, self.u_goal), ramp(self.b, self.b_goal), ramp(self.m, self.m_goal)
-        self.plate_ref += float(np.clip(self.plate_goal - self.plate_ref, -self.rate * dt, self.rate * dt))
+        # float(np.clip(...)) on scalars, as min(max(...)): the same value without numpy's overhead every step
+        self.plate_ref += float(min(max(self.plate_goal - self.plate_ref, -self.rate * dt), self.rate * dt))
         return self.u, self.b, self.m
 
     # ---- every camera sample ---------------------------------------------------------------------

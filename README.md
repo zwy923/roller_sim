@@ -227,6 +227,10 @@ runs/                  新运行产物（不进 git）
 - **改模块常量**不再在任务文件里写 `singulator.station.X`，改用 `--set control.station.X=值`（任务文件的 `"set"` 同理）；`python -m singulator.tuning` 列出全部可改的常量及其所在模块。
 - **换称重 / 体积装置**：`sensing/weigher.py` 的 `Weigher`、`sensing/volume.py` 的 `Scanner` 是工位控制器用到的全部接口，换实现不用动控制器。
 
+## 2026-10-06 提速
+
+单批运行快约 2.2 倍（同机 4 进程跑 14 批：总耗时 1224 → 558 s，单批 1.9–2.5 倍），结果逐位不变：只减少了每步、每帧 Python 里重复的计算和 numpy 调用，物理和控制规则没动。改了什么、怎么验证的、以后改这些路径要注意什么，见 [ARCHITECTURE.md](docs/ARCHITECTURE.md#2026-10-06-提速结果逐位不变)。
+
 ## 2026-10-06 修复
 
 S8 的准备和试验里修的，自检在 `checks/physics_regression_checks.py`、`checks/feeder_regression_checks.py`。

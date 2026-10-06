@@ -2,21 +2,31 @@
 
 Pure numpy; no state, no tunables. Used by the layouts (do two lumps overlap), the cameras' model (outline,
 centroid, how convex), the face's closing sweep and the station (how close are two objects).
+
+The cameras call some of these hundreds of times a simulated second on a dozen vertices, where each numpy call costs
+more than the arithmetic: clip, normals_list and surely_outside work in Python floats instead, with the same
+operations in the same order -- the same numbers (docs/ARCHITECTURE.md, 2026-10-06). Sums and dot products stay in
+numpy: done in Python they would round differently.
 """
 import math
 
 import numpy as np
 
 
+def _next(a):
+    """np.roll(a, -1, 0): each vertex's successor round the polygon (the same array, at a fraction of the cost)."""
+    return np.concatenate((a[1:], a[:1]))
+
+
 def poly_area(P):
     x, y = P[:, 0], P[:, 1]
-    return .5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+    return .5 * abs(float(np.dot(x, _next(y)) - np.dot(y, _next(x))))
 
 
 def poly_centroid(P):
     """Area centroid of a polygon (its vertex mean when it has no area)."""
     x, y = P[:, 0], P[:, 1]
-    xn, yn = np.roll(x, -1), np.roll(y, -1)
+    xn, yn = _next(x), _next(y)
     c = x * yn - xn * y
     a = c.sum() / 2
     if abs(a) < 1e-12:
@@ -46,34 +56,66 @@ def hull2(P):
     return np.array(H) if len(H) >= 3 else P            # degenerate (collinear) point set: as it is
 
 
-def inside(P, x, y, pad=0.):
-    """Which points (x, y) (scalars or arrays) lie inside the counter-clockwise convex polygon P grown by pad."""
-    e = np.roll(P, -1, 0) - P
-    n = np.stack([e[:, 1], -e[:, 0]], 1)                # outward normals
-    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
-    q = np.stack([np.asarray(x, float), np.asarray(y, float)], -1)
+def normals(P):
+    """Unit outward normals of the edges of a counter-clockwise convex polygon P (edge i runs from P[i])."""
+    e = _next(P) - P
+    n = np.stack([e[:, 1], -e[:, 0]], 1)
+    # np.linalg.norm(n, axis=1, keepdims=True) is this sum, behind a long path of checks
+    n /= np.maximum(np.sqrt(np.add.reduce(n * n, axis=1, keepdims=True)), 1e-12)
+    return n
+
+
+def normals_list(P):
+    """normals(P) for P as a list of vertices, as a list: the same operations, vertex by vertex."""
+    out = []
+    for (ax, ay), (bx, by) in zip(P, P[1:] + P[:1]):
+        nx, ny = by - ay, -(bx - ax)
+        r = max(math.sqrt(nx * nx + ny * ny), 1e-12)
+        out.append([nx / r, ny / r])
+    return out
+
+
+def inside(P, x, y, pad=0., n=None):
+    """Which points (x, y) (scalars or arrays) lie inside the counter-clockwise convex polygon P grown by pad.
+    n: normals(P), when P is tested more than once."""
+    if n is None:
+        n = normals(P)
+    if type(x) is float and type(y) is float:
+        q = np.array((x, y))                            # one point: what the stack below makes of it
+    else:
+        q = np.stack([np.asarray(x, float), np.asarray(y, float)], -1)
     d = np.einsum('...ij,ij->...i', q[..., None, :] - P, n)
     return np.all(d <= pad, axis=-1)
 
 
+def surely_outside(P, n, x, y, pad=0., tol=1e-9):
+    """The point (x, y) lies more than pad + tol outside an edge of the convex polygon P: inside(P, x, y, pad) is
+    then False, however its sum is rounded. P and n = normals(P) as lists; False proves nothing."""
+    return any((x - px) * nx + (y - py) * ny > pad + tol for (px, py), (nx, ny) in zip(P, n))
+
+
 def clip(P, Q):
-    """Intersection of two convex counter-clockwise polygons (Sutherland-Hodgman)."""
-    out = P
+    """Intersection of two convex counter-clockwise polygons (Sutherland-Hodgman). Worked in Python floats: the
+    same operations as on the numpy rows, without numpy's cost per vertex."""
+    if not len(Q) or not len(P):
+        return P
+    Q, out = np.asarray(Q).tolist(), np.asarray(P).tolist()
     for i in range(len(Q)):
-        a, b = Q[i], Q[(i + 1) % len(Q)]
-        if not len(out):
+        (ax, ay), (bx, by) = Q[i], Q[(i + 1) % len(Q)]
+        if not out:
             break
-        side = lambda p: (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
         res = []
         for j in range(len(out)):
             p, q = out[j], out[(j + 1) % len(out)]
-            sp, sq = side(p), side(q)
+            sp = (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax)
+            sq = (bx - ax) * (q[1] - ay) - (by - ay) * (q[0] - ax)
             if sp >= 0:
                 res.append(p)
             if sp * sq < 0:
-                res.append(p + (q - p) * (sp / (sp - sq)))
-        out = np.array(res)
-    return out
+                r = sp / (sp - sq)
+                res.append([p[0] + (q[0] - p[0]) * r, p[1] + (q[1] - p[1]) * r])
+        out = res
+    return np.array(out)
 
 
 def overlap(a, b, margin=.005):

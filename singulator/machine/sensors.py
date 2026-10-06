@@ -41,13 +41,25 @@ def look_at(pos, target, x_hint=(1., 0., 0.)):
     return x, np.cross(z, x), z
 
 
+def frustum(cam):
+    """What in_view tests points against: the camera's position, its axes as columns, the tangent of half its
+    vertical field of view and its aspect. Worth keeping for a camera that tests points every frame."""
+    return (cam['pos'], np.stack([cam['x'], cam['y'], cam['z']], 1), math.tan(math.radians(cam['fovy']) / 2),
+            cam['aspect'])
+
+
+def in_frustum(f, P):
+    """in_view on a camera's frustum(): which of the world points P (n, 3) -- a 2-D array -- lie inside it, as a
+    list. The camera's coordinates of the points are numpy's; the tests on them, point by point, are the same
+    operations numpy would do element by element, without numpy's cost per call on a dozen points."""
+    pos, R, ty, aspect = f
+    return [-z > 0 and abs(x) <= -z * ty * aspect + 1e-9 and abs(y) <= -z * ty + 1e-9
+            for x, y, z in ((P - pos) @ R).tolist()]
+
+
 def in_view(cam, P):
     """Which of the world points P (n, 3) lie inside the camera's view frustum."""
-    R = np.stack([cam['x'], cam['y'], cam['z']], 1)
-    pc = (np.atleast_2d(P) - cam['pos']) @ R
-    depth = -pc[:, 2]
-    ty = math.tan(math.radians(cam['fovy']) / 2)
-    return (depth > 0) & (np.abs(pc[:, 0]) <= depth * ty * cam['aspect'] + 1e-9) & (np.abs(pc[:, 1]) <= depth * ty + 1e-9)
+    return np.array(in_frustum(frustum(cam), np.atleast_2d(P)), dtype=bool)
 
 
 def corners(lo, hi):

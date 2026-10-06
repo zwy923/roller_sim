@@ -20,6 +20,7 @@ class Trace:
     def __init__(self, cfg, d, model, lumps):
         self.cfg, self.d, self.model, self.lumps = cfg, d, model, lumps
         self.cat = categorise(model)
+        self.cat_list = self.cat.tolist()
         self.geom_lump = {L.geom: L.k for L in lumps}
         dt = model.opt.timestep
         stride = max(1, round(SAMPLE_S / dt))
@@ -39,11 +40,10 @@ class Trace:
         'feeder' / 'station' / False -- is the lump waiting by plan, for its stall record."""
         lumps, dt_sample = self.lumps, self.dt_sample
         touch = self.touch = {L.k: set() for L in lumps}
-        for c in range(data.ncon):
-            g1, g2 = data.contact.geom1[c], data.contact.geom2[c]
+        for g1, g2 in data.contact.geom[:data.ncon].tolist():
             for ga, gb in ((g1, g2), (g2, g1)):
                 if ga in self.geom_lump:
-                    touch[self.geom_lump[ga]].add(CATS[self.cat[gb]])
+                    touch[self.geom_lump[ga]].add(CATS[self.cat_list[gb]])
         live = []
         for L in lumps:
             if L.state == 'taken_off':
@@ -73,11 +73,9 @@ class Trace:
     def face_force(self, data):
         """Total lump-face normal force now, N."""
         face_N, wrench = 0., np.zeros(6)
-        lump, face = CATS.index('block'), CATS.index('plough')
-        for ci in range(data.ncon):
-            con = data.contact[ci]
-            c1, c2 = int(self.cat[con.geom1]), int(self.cat[con.geom2])
-            if {c1, c2} != {lump, face}:
+        pair, cat = {CATS.index('block'), CATS.index('plough')}, self.cat_list
+        for ci, (g1, g2) in enumerate(data.contact.geom[:data.ncon].tolist()):
+            if {cat[g1], cat[g2]} != pair:
                 continue
             mujoco.mj_contactForce(self.model, data, ci, wrench)
             face_N += float(wrench[0])

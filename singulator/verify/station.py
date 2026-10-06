@@ -21,9 +21,7 @@ def frame_contacts(data, frame, lump_of):
     a geom of `frame`; other: {lump: {other lumps by id, 'equipment' for anything else off the frame}}.
     lump_of: {geom id: lump}."""
     on, other = set(), {}
-    for i in range(data.ncon):
-        con = data.contact[i]
-        g1, g2 = int(con.geom1), int(con.geom2)
+    for g1, g2 in data.contact.geom[:data.ncon].tolist():
         k1, k2 = lump_of.get(g1), lump_of.get(g2)
         if g1 in frame or g2 in frame:
             k = k2 if g1 in frame else k1

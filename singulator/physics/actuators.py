@@ -9,6 +9,12 @@ from ..machine import plough, separator
 from .drives import make_motor
 
 
+def _clip(x, lo, hi):
+    """float(np.clip(x, lo, hi)) for scalars -- the same minimum(maximum(x, lo), hi) -- without numpy's
+    overhead, which every physics step paid."""
+    return float(min(max(x, lo), hi))
+
+
 class FaceServo:
     """The face's hinge in the MuJoCo model: a finite-torque position servo. MuJoCo alone advances the hinge
     position and velocity.
@@ -52,11 +58,11 @@ class FaceServo:
         if phase in ('out', 'back'):
             goal = self.delta if phase == 'out' else 0.
             rate = abs(self.delta) / self.swing_s
-            self.reference += float(np.clip(goal - self.reference, -rate*self.dt, rate*self.dt))
+            self.reference += _clip(goal - self.reference, -rate*self.dt, rate*self.dt)
             # Position error corresponding to the force limit; prevents reference wind-up at a jam.
             max_error = self.drive['F_max'] * self.lever / self.cfg['face_kp']
-            self.reference = float(np.clip(self.reference, self.theta-max_error, self.theta+max_error))
-            self.reference = float(np.clip(self.reference, min(0., self.delta), max(0., self.delta)))
+            self.reference = _clip(self.reference, self.theta-max_error, self.theta+max_error)
+            self.reference = _clip(self.reference, min(0., self.delta), max(0., self.delta))
         elif phase != self.last_phase:
             self.reference = self.theta if phase != 'idle' else 0.
         data.ctrl[self.actuator] = self.reference
@@ -115,6 +121,7 @@ class PlateDrive:
         self.ext = (deg, np.array([separator.state(sep, a)['piston_extension_m'] for a in deg]))
         self.q = model.jnt_qposadr[model.joint(separator.PREFIX + 'plate_hinge').id]
         self.actuator = model.actuator(separator.PREFIX + 'cylinder_position').id
+        self._asked = None                      # (deg, extension) of the last command: the plate mostly stands
 
     def place(self, data):
         """Plate down (coal), linkage closed: the pose at t = 0."""
@@ -122,7 +129,9 @@ class PlateDrive:
 
     def command(self, data, deg):
         """Ask for the plate angle `deg` (the station's ramped reference) for the coming step."""
-        data.ctrl[self.actuator] = float(np.interp(deg, *self.ext))
+        if self._asked is None or self._asked[0] != deg:
+            self._asked = deg, float(np.interp(deg, *self.ext))
+        data.ctrl[self.actuator] = self._asked[1]
 
     def angle(self, data):
         """The plate encoder, deg."""

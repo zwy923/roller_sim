@@ -27,8 +27,11 @@ def world_vertices(data, geom, local):
     return data.geom_xpos[geom] + local @ data.geom_xmat[geom].reshape(3, 3).T
 
 
-def exit_cut(V, edges, x):
-    """y-interval of a convex block's cross-section with the vertical plane at x, or None if it does not reach it."""
+def exit_cut(V, edges, x, span=None):
+    """y-interval of a convex block's cross-section with the vertical plane at x, or None if it does not reach it.
+    span: (min, max) of V's x, when known -- a block wholly on one side of the plane has no edge crossing it."""
+    if span is not None and not span[0] <= x <= span[1]:
+        return None
     P, Q = V[edges[:, 0]], V[edges[:, 1]]
     dp, dq = P[:, 0] - x, Q[:, 0] - x
     m = (dp * dq <= 0) & (dp != dq)
@@ -90,16 +93,16 @@ class Lump:
         R = data.xmat[self.body].reshape(3, 3)            # body frame: long axis = body x, for yaw
         V = self.world(data)
         self.V = V                                         # world outline; the feeder's drop beam tests it
+        (x0, y0, z0), (x1, y1, z1) = self.box = V.min(0).tolist(), V.max(0).tolist()   # the beams test it too
         com = data.xipos[self.body]
-        self.s_hist.append((t, float(V[:, 0].max())))
+        self.s_hist.append((t, x1))
         self.c_hist.append((t, float(com[0])))
-        self.plan, self.ztop = V[:, :2].copy(), float(V[:, 2].max())
+        self.plan, self.ztop = V[:, :2].copy(), z1
         if 'plough' in touch:
             self.touched_plough = True
-        self.last_pose = (float(com[0]), float(com[1]), float(com[2]), float(V[:, 0].min()), float(V[:, 0].max()),
-                          float(V[:, 1].min()), float(V[:, 1].max()), yaw_deg(R), sorted(touch))
-        if V[:, 2].min() < d['drop_z'] and self.drop_t is None:
-            self.drop_t, self.drop_x = t, float(V[:, 0].max())
+        self.last_pose = (float(com[0]), float(com[1]), float(com[2]), x0, x1, y0, y1, yaw_deg(R), sorted(touch))
+        if z0 < d['drop_z'] and self.drop_t is None:
+            self.drop_t, self.drop_x = t, x1
             self.state, self.bin = station.landing(d['station'], com)
         if len(self.c_hist) > 1 and self.state == 'on_belt' and t > cfg['ramp'] + 1.:
             if self.c_hist[-1][1] - self.c_hist[-2][1] < slow:
@@ -110,20 +113,20 @@ class Lump:
                     self.station_wait_s += dt_sample
                 else:
                     self.stalled_s += dt_sample
-        lane_cut = exit_cut(V, self.edges, d['exit_x'])
+        lane_cut = exit_cut(V, self.edges, d['exit_x'], (x0, x1))
         if lane_cut is not None and self.lane_t is None:
             self.lane_t, self.lane_cut = t, lane_cut
             self.lane_yaw = misalignment(yaw_deg(R))
-        if self.lane_tail_t is None and V[:, 0].min() > d['exit_x']:
+        if self.lane_tail_t is None and x0 > d['exit_x']:
             self.lane_tail_t = t
-        cut = exit_cut(V, self.edges, d['final_x'])
+        cut = exit_cut(V, self.edges, d['final_x'], (x0, x1))
         first = False
         if cut is not None:
             if self.enter is None:
                 self.enter, self.cut_n, first = t, cut, True
                 self.face_yaw = misalignment(yaw_deg(R))
             self.leave = t
-        elif self.enter is not None and V[:, 0].min() > d['final_x'] and self.state == 'on_belt':
+        elif self.enter is not None and x0 > d['final_x'] and self.state == 'on_belt':
             self.state = 'passed'
             self.pass_t = t
         return cut, first

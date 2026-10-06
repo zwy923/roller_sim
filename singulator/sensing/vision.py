@@ -28,7 +28,7 @@ from collections import deque
 
 import numpy as np
 
-from ..geom2d import box_gap, clip, hull2, inside, poly_area, poly_centroid
+from ..geom2d import box_gap, clip, hull2, inside, normals_list, poly_area, poly_centroid, surely_outside
 from ..machine import sensors
 
 POS_SIGMA = .005       # m: outline position noise per frame, per axis
@@ -107,6 +107,8 @@ class Vision:
         """cameras: machine.sensors.layout()['cameras']; rng: the noise stream; exits(x, y) -> True where a lump may
         leave the view normally (past the measuring belt: the separator and the bins)."""
         self.cams, self.rng, self.exits, self.oracle = cameras, rng, exits, oracle
+        self.frusta = [sensors.frustum(c) for c in cameras]
+        self.covered_by = {}                               # lump -> the camera that last saw all its top points
         self.tracks, self.next_tid = {}, 0
         self.together = frozenset()                        # lump pairs in one blob last frame (hysteresis)
         self.queue = deque()
@@ -128,28 +130,49 @@ class Vision:
         return any(t0 <= t < t1 for t0, t1 in self.outage)
 
     # ---- the scene -> blobs ------------------------------------------------------------------------
-    def _visible(self, V, t):
-        """Fraction of a lump's top points inside at least one camera's view, and those points."""
+    def _visible(self, V, t, memo, k):
+        """Fraction of a lump's top points inside at least one camera's view, and those points. memo: what this
+        frame has already found out about lump k (see frame())."""
         if self.dark(t):
             return 0., V[:0]
-        z = V[:, 2]
-        top = V[z >= z.min() + .5 * (z.max() - z.min())]
-        seen = np.zeros(len(top), bool)
-        for c in self.cams:
-            seen |= sensors.in_view(c, top)
-        return float(seen.mean()), top[seen]
+        if ('vis', k) not in memo:
+            z = V[:, 2]
+            top = V[z >= z.min() + .5 * (z.max() - z.min())]
+            seen = None
+            # the camera that saw all of it last frame first: a lump moves little in 10 ms, and once every point
+            # is seen the other views cannot change the answer
+            first = self.covered_by.get(k, 0)
+            for i in [first] + [i for i in range(len(self.frusta)) if i != first]:
+                hits = sensors.in_frustum(self.frusta[i], top)
+                seen = hits if seen is None else [a or b for a, b in zip(seen, hits)]
+                if all(seen):
+                    self.covered_by[k] = i
+                    break
+            n = sum(seen)
+            memo['vis', k] = (1., top) if n == len(seen) else (n / len(seen), top[np.array(seen, dtype=bool)])
+        return memo['vis', k]
 
-    def _blobs(self, t, lumps, dist):
+    @staticmethod
+    def _plan(lumps, memo, k):
+        """Plan outline (convex hull) of lump k."""
+        if ('plan', k) not in memo:
+            memo['plan', k] = hull2(lumps[k][:, :2])
+        return memo['plan', k]
+
+    def _blobs(self, t, lumps, dist, memo):
         """lumps: {k: world vertices}; dist(i, j): 3-D gap between two lumps (capped). Returns the blobs."""
-        vis = {k: self._visible(lumps[k], t) for k in sorted(lumps)}
+        vis = {k: self._visible(lumps[k], t, memo, k) for k in sorted(lumps)}
         seen = [k for k in sorted(lumps) if vis[k][0] >= VIS_MIN]
         out = []
         gs = groups(seen, dist, self.together) if not self.oracle else [[k] for k in seen]
         self.together = frozenset(frozenset((a, b)) for g in gs for a in g for b in g if a < b)
         for g in gs:
-            hulls = [hull2(lumps[k][:, :2]) for k in g]
-            pts = hull2(np.concatenate([lumps[k][:, :2] if vis[k][0] >= 1. else vis[k][1][:, :2] for k in g]))
-            out.append(dict(truth=tuple(g), pts=pts, solid=solidity(hulls) if len(g) > 1 else 1.,
+            if len(g) == 1 and vis[g[0]][0] >= 1.:
+                pts = self._plan(lumps, memo, g[0])    # one lump in full view: its own outline
+            else:
+                pts = hull2(np.concatenate([lumps[k][:, :2] if vis[k][0] >= 1. else vis[k][1][:, :2] for k in g]))
+            out.append(dict(truth=tuple(g), pts=pts,
+                            solid=solidity([self._plan(lumps, memo, k) for k in g]) if len(g) > 1 else 1.,
                             vis=min(vis[k][0] for k in g), ztop=max(float(lumps[k][:, 2].max()) for k in g)))
         return out
 
@@ -157,14 +180,15 @@ class Vision:
         P, solid, ztop = b['pts'], b['solid'], b['ztop']
         if not self.oracle:
             c = P.mean(0)
-            size = max(float(np.linalg.norm(P - c, axis=1).mean()), 1e-3)
-            P = c + (P - c) * (1. + self.rng.normal(0., EDGE_SIGMA) / size) + self.rng.normal(0., POS_SIGMA, 2)
+            D = P - c
+            size = max(float(np.sqrt(np.add.reduce(D * D, axis=1)).mean()), 1e-3)   # np.linalg.norm(D, axis=1)
+            P = c + D * (1. + self.rng.normal(0., EDGE_SIGMA) / size) + self.rng.normal(0., POS_SIGMA, 2)
             solid = min(1., solid + self.rng.normal(0., .01))
             ztop += self.rng.normal(0., HEIGHT_SIGMA)
         c = poly_centroid(P)
-        return dict(pts=P, cx=float(c[0]), cy=float(c[1]), x0=float(P[:, 0].min()), x1=float(P[:, 0].max()),
-                    y0=float(P[:, 1].min()), y1=float(P[:, 1].max()), ztop=float(ztop), solid=float(solid),
-                    vis=b['vis'], _truth=b['truth'])
+        (x0, y0), (x1, y1) = P.min(0).tolist(), P.max(0).tolist()
+        return dict(pts=P, cx=float(c[0]), cy=float(c[1]), x0=x0, x1=x1, y0=y0, y1=y1, ztop=float(ztop),
+                    solid=float(solid), vis=b['vis'], _truth=b['truth'])
 
     # ---- tracking --------------------------------------------------------------------------------------
     @staticmethod
@@ -172,13 +196,23 @@ class Vision:
         """Least-squares centroid velocity over a track history [(t, x, y)]; None until it spans VEL_WINDOW."""
         if len(h) < 3 or h[-1][0] - h[0][0] < VEL_WINDOW - 1e-9:
             return None
-        T = np.array([p[0] for p in h])
+        H = np.array(h)
+        T = H[:, 0].copy()
         A = np.stack([T - T.mean(), np.ones_like(T)], 1)
-        sol = np.linalg.lstsq(A, np.array([[p[1], p[2]] for p in h]), rcond=None)[0]
+        sol = np.linalg.lstsq(A, H[:, 1:], rcond=None)[0]
         return float(sol[0, 0]), float(sol[0, 1])
 
+    def _velocity(self, tr):
+        """velocity() of a track's history, worked out once for each state of it: a history only grows at its end
+        and is cut at its start, so its length and end times tell its states apart."""
+        h = tr['hist']
+        key = len(h), h[0][0], h[-1][0]
+        if tr.get('v_of') != key:
+            tr['v_of'], tr['v'] = key, self.velocity(h)
+        return tr['v']
+
     def _predict(self, tr, t):
-        h, v = tr['hist'], self.velocity(tr['hist'])
+        h, v = tr['hist'], self._velocity(tr)
         dt = t - h[-1][0]
         return h[-1][1] + (v[0] * dt if v else 0.), h[-1][2] + (v[1] * dt if v else 0.)
 
@@ -208,11 +242,13 @@ class Vision:
                 tr['area_ref'] = a
                 self.events.append(dict(t_s=round(t, 3), event='shrank', tid=tr['tid'], count=tr['count']))
 
-    def frame(self, t, lumps, dist, com=None):
+    def frame(self, t, lumps, dist, com=None, memo=None):
         """Advance one 10 ms frame. lumps: {k: world vertices} of every lump in the line (above the drop
         level, not taken off the line); com: {k: true centroid} -- the oracle's centroid, and the
-        verification's reference. Returns what the controllers see now (sensors.LATENCY_S old)."""
-        blobs = [self._measure(b) for b in self._blobs(t, lumps, dist)]
+        verification's reference; memo: a dict for this frame's scene, shared by Visions with the same cameras
+        that look at it (each lump's plan outline and what of it the cameras cover is worked out once). Returns
+        what the controllers see now (sensors.LATENCY_S old)."""
+        blobs = [self._measure(b) for b in self._blobs(t, lumps, dist, {} if memo is None else memo)]
         if self.oracle:
             fr = Frame()
             for m in blobs:
@@ -225,10 +261,23 @@ class Vision:
             return fr
         tracks = list(self.tracks.values())
         pred = {tr['tid']: self._predict(tr, t) for tr in tracks}
-        cand = [[tr['tid'] for tr in tracks
-                 if inside(m['pts'], *pred[tr['tid']], pad=.03)
-                 or math.hypot(m['cx'] - pred[tr['tid']][0], m['cy'] - pred[tr['tid']][1]) < MATCH_GATE]
-                for m in blobs]
+        cand = []
+        for m in blobs:
+            edges = None
+            near = []
+            for tr in tracks:
+                x, y = pred[tr['tid']]
+                if math.hypot(m['cx'] - x, m['cy'] - y) < MATCH_GATE:
+                    near.append(tr['tid'])
+                    continue
+                if edges is None:
+                    P = m['pts'].tolist()
+                    edges = P, normals_list(P)
+                # most tracks are clearly elsewhere: settled in Python, the rest by inside() itself
+                if not surely_outside(*edges, x, y, pad=.03) and inside(m['pts'], x, y, pad=.03,
+                                                                        n=np.array(edges[1])):
+                    near.append(tr['tid'])
+            cand.append(near)
         by_track = {}
         for i, near in enumerate(cand):
             for tid in near:
@@ -318,7 +367,7 @@ class Vision:
             h = tr['hist']
             while len(h) > 2 and h[1][0] < t - VEL_WINDOW - 1e-9:
                 h.pop(0)
-            m, v, age = tr['m'], self.velocity(h), t - tr['born']
+            m, v, age = tr['m'], self._velocity(tr), t - tr['born']
             coasting = tr['seen'] < t - 1e-9
             seen = 0. if coasting else min(1., max(0., (m['vis'] - VIS_MIN) / (VIS_FULL - VIS_MIN)))
             seen *= min(1., age / BIRTH_S)

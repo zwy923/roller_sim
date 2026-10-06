@@ -51,15 +51,16 @@ class LoadCell:
     def force(self, data):
         """The reading now, N: the downward contact force of every lump touching the weigh frame."""
         frame, lump_of, w = self.frame, self.lump_of, self._w
-        Fz = 0.
-        for i in range(data.ncon):
-            con = data.contact[i]
-            g1, g2 = int(con.geom1), int(con.geom2)
+        Fz, ncon = 0., data.ncon
+        if not ncon:
+            return Fz
+        contact = data.contact
+        for i, (g1, g2) in enumerate(contact.geom[:ncon].tolist()):     # the pairs as a list: no struct per contact
             if g1 in frame or g2 in frame:
                 if lump_of.get(g2 if g1 in frame else g1) is None:
                     continue
                 mujoco.mj_contactForce(self.model, data, i, w)
-                f = con.frame.reshape(3, 3).T @ w[:3]            # force of geom1 on geom2, world frame
+                f = contact.frame[i].reshape(3, 3).T @ w[:3]            # force of geom1 on geom2, world frame
                 Fz += f[2] if g1 in frame else -f[2]
         return Fz
 

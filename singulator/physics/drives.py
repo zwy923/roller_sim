@@ -33,12 +33,12 @@ def make_motor(force_max, mass, v_ref, slip):
 
 def motor_update(m, f_target, load, dt):
     """Advance the speed factor one step. load = contact force on the drive at v_ref (negative resists)."""
-    a = dt / m['M_eff']
+    a, f, gain, F_max = dt / m['M_eff'], m['f'], m['gain'], m['F_max']
     # implicit in the proportional term, so a very stiff (or effectively unlimited) drive stays stable
-    f_new = (m['f'] + a * (m['gain'] * f_target + load)) / (1 + a * m['gain'])
-    force = m['gain'] * (f_target - f_new)
-    if abs(force) > m['F_max']:
-        f_new = m['f'] + a * (math.copysign(m['F_max'], force) + load)
+    f_new = (f + a * (gain * f_target + load)) / (1 + a * gain)
+    force = gain * (f_target - f_new)
+    if abs(force) > F_max:
+        f_new = f + a * (math.copysign(F_max, force) + load)
     m['f'] = max(0., f_new)
 
 
@@ -82,21 +82,29 @@ class Belt:
 
     def command(self, data):
         """Hold the plate and write its surface velocity for the coming step."""
+        qvel, v = data.qvel, self.speed * self.motor['f']
         data.qpos[self.q] = 0.
-        data.qvel[self.dof] = self.speed * self.motor['f']
+        qvel[self.dof] = v
         for dof, R in self.pulleys or ():
-            data.qvel[dof] = self.speed * self.motor['f'] / R
+            qvel[dof] = v / R
 
     def load(self, data):
         """Contact force of the last step on the drive, at the belt surface (negative resists), N."""
-        F = float(data.qfrc_constraint[self.dof])
+        return self._load(data.qfrc_constraint)
+
+    def _load(self, qfrc):
+        """load() from qfrc_constraint, as the array or as a list."""
+        F = float(qfrc[self.dof])
         if self.pulleys is None:
             return F
-        return F + sum((float(data.qfrc_constraint[dof]) / R for dof, R in self.pulleys), 0.)
+        return F + sum((float(qfrc[dof]) / R for dof, R in self.pulleys), 0.)
 
     def after_step(self, data, counted, dt):
         """Let the motor answer the load of the step. counted: the start-up is over (stalls are counted)."""
-        m, target, load = self.motor, self.target, self.load(data)
+        self._after_step(self._load(data.qfrc_constraint), counted, dt)
+
+    def _after_step(self, load, counted, dt):
+        m, target = self.motor, self.target
         record_load(m, load, dt)
         if self.brakes and target <= 0.:
             brake_update(m, load, dt)
@@ -123,18 +131,29 @@ class SlatChain(Belt):
         self.x0, self.length = x0, length
         self.base = np.arange(len(q)) * pitch
         self.travel = 0.
+        # the slats' joints follow one another in the model: slices address them without a gather
+        run = lambda a: slice(int(a[0]), int(a[-1]) + 1) if len(a) and (np.diff(a) == 1).all() else a
+        self.q_run, self.dof_run = run(q), run(dof)
+        self._at = np.empty(len(q))
 
     def command(self, data):
         if len(self.q):
-            data.qpos[self.q] = self.x0 + np.mod(self.base + self.travel, self.length)
-            data.qvel[self.dof] = self.speed * self.motor['f']
+            at = self._at
+            np.add(self.base, self.travel, out=at)
+            np.mod(at, self.length, out=at)
+            at += self.x0
+            data.qpos[self.q_run] = at
+            data.qvel[self.dof_run] = self.speed * self.motor['f']
 
-    def load(self, data):
-        return float(data.qfrc_constraint[self.dof].sum()) if len(self.q) else 0.
+    def _load(self, qfrc):
+        return float(qfrc[self.dof_run].sum()) if len(self.q) else 0.
 
     def after_step(self, data, counted, dt):
+        self._after_step(self._load(data.qfrc_constraint), counted, dt)
+
+    def _after_step(self, load, counted, dt):
         self.travel += self.speed * self.motor['f'] * dt
-        super().after_step(data, counted, dt)
+        super()._after_step(load, counted, dt)
 
 
 class Conveyors:
@@ -183,9 +202,10 @@ class Conveyors:
 
     def after_step(self, data, t, dt):
         """Read the loads the step put on each drive and let the motors respond."""
-        counted = t > self.cfg['ramp'] + .2
+        counted, qfrc = t > self.cfg['ramp'] + .2, data.qfrc_constraint
+        listed = qfrc.tolist()          # the plates read single entries: from a list, not one numpy call each
         for b in self.all:
-            b.after_step(data, counted, dt)
+            b._after_step(b._load(qfrc if b is self.side else listed), counted, dt)
 
     def factors(self):
         return [b.f for b in self.all]

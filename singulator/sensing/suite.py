@@ -100,12 +100,15 @@ class Sensors:
             if f['kind'].startswith('beam_') and not f.get('done') and t >= f['t'] - 1e-9:
                 self.beams[f['beam']].fault = f['kind'][5:]          # 'dirty' reads blocked, 'dead' never
                 f['done'] = round(t, 3)
-        self.scene = {L.k: L.V for L in self.lumps if L.state in IN_LINE}
+        live = [L for L in self.lumps if L.state in IN_LINE]
+        self.scene = {L.k: L.V for L in live}
+        outlines, boxes = [L.V for L in live], [L.box for L in live]
         for b in self.beams.values():
-            b.sample(t, list(self.scene.values()))
-        com = {L.k: self.data.xipos[L.body].copy() for L in self.lumps if L.state in IN_LINE}
-        fr = self.vision.frame(t, self.scene, self.dist, com)
-        self.feed_view = self.ideal.frame(t, self.scene, self.dist, com) if self.ideal else fr
+            b.sample(t, outlines, boxes)
+        com = {L.k: self.data.xipos[L.body].copy() for L in live}
+        memo = {}                                   # the two views share what they work out about the scene
+        fr = self.vision.frame(t, self.scene, self.dist, com, memo)
+        self.feed_view = self.ideal.frame(t, self.scene, self.dist, com, memo) if self.ideal else fr
         self.weigher.sample(self.load_cell.force(self.data))
         return fr
 

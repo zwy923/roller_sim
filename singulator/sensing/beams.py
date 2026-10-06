@@ -13,10 +13,11 @@ DIAG_S = .50           # s: blocked this long while the cameras see the line cle
                        # the line this long without a block = dead
 
 
-def cuts_line(V, x, z):
+def cuts_line(V, x, z, box=None):
     """A beam across the belt at (x, z) meets the convex hull V exactly when (x, z) lies in the hull's
-    projection on the x-z plane."""
-    if not (V[:, 0].min() < x < V[:, 0].max() and V[:, 2].min() < z < V[:, 2].max()):
+    projection on the x-z plane. box: V's ((min x, y, z), (max x, y, z)), when known."""
+    (x0, _, z0), (x1, _, z1) = box if box is not None else (V.min(0), V.max(0))
+    if not (x0 < x < x1 and z0 < z < z1):
         return False
     h = ConvexHull(V[:, [0, 2]])
     return bool(np.all(h.equations[:, :2] @ (x, z) + h.equations[:, 2] <= 0.))
@@ -33,9 +34,10 @@ class Beam:
         self.t_dirty = self.t_dead = self.last_t = None
         self.run_block = 0.                                     # s blocked while no block was planned
 
-    def sample(self, t, lumps):
-        """lumps: world vertices of every lump in the line. Returns the (debounced) state."""
-        raw = any(cuts_line(V, self.x, self.z) for V in lumps)
+    def sample(self, t, lumps, boxes=None):
+        """lumps: world vertices of every lump in the line; boxes: their bounding boxes, when known (cuts_line).
+        Returns the (debounced) state."""
+        raw = any(cuts_line(V, self.x, self.z, B) for V, B in zip(lumps, boxes or [None] * len(lumps)))
         if self.fault == 'dead':
             raw = False
         elif self.fault == 'dirty':
