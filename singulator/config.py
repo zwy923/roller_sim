@@ -234,7 +234,7 @@ PARAMS = {
         P('name', 'pl', str, 'the outputs go to runs/<name>_<time>/'),
         P('video', True, FLAG, 'render video.mp4 (default); --no-video: results only'),
         P('fps', 30, int),
-        P('video_speed', 2., float),
+        P('video_speed', 1., float, 'playback speed of video.mp4 against the simulation (1 = real time)'),
         P('width', 1280, int, 'video frame, pixels'),
         P('height', 1000, int),
         P('top_h', 340, int, 'height of the plan view strip at the bottom of the frame, pixels'),

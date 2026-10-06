@@ -27,7 +27,7 @@ from . import tuning
 from .config import validate
 from .sim import results
 from .sim.line import Line
-from .sim.video import Recorder, overlay
+from .sim.video import Recorder, overlay, plan_labels
 
 
 def run(cfg, save=True):
@@ -42,7 +42,7 @@ def run(cfg, save=True):
         while line.advance():
             if rec and rec.due(line.t):
                 # with the feed belt the camera follows the released lumps, not the ones queued on it
-                rec.frame(line.data, line.followed(), overlay(line))
+                rec.frame(line.data, line.followed(), overlay(line), plan_labels(line))
         if rec:
             rec.close()
         out = results.assemble(line, time.time() - wall)

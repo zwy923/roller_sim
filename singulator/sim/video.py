@@ -10,7 +10,6 @@ FONTS = (Path(r'C:\Windows\Fonts\msyh.ttc'), Path('/usr/share/fonts/truetype/wqy
 FONT = next((p for p in FONTS if p.exists()), FONTS[0])
 
 FACE_PHASE_ZH = dict(idle='常位', out='撤离中', hold='撤离保持', back='复位中', fault='犁面运动故障')
-FEEDER_PHASE_ZH = dict(feeding='放料', stopped='停（等放下的料进直道）', empty='已放空')
 STAGE_ZH = dict(buffer='缓冲', transfer='上计量带', onm='在计量带上', measure='称重+测体积', decided='等排料板',
                 discharge='排出', hold='作废停住')
 PLATE_ZH = dict(closed='落板（煤）', opening='抬起中', open='抬起（矸）', closing='回落中')
@@ -33,6 +32,8 @@ class Recorder:
         self.follow_x1 = d['station']['separator']['pivot'][0]
         self.follow_drop = max(self.follow_x1 - d['exit_x'], 1e-9)
         self.top_cam = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, 'top')
+        self.top_pos, self.top_extent = model.cam_pos[self.top_cam].copy(), float(model.cam_fovy[self.top_cam])
+        self.iso_h = cfg['height'] - cfg['top_h']
         self.font = ImageFont.truetype(str(FONT), 24) if FONT.exists() else ImageFont.load_default()
         self.small = ImageFont.truetype(str(FONT), 18) if FONT.exists() else self.font
         self.writer = imageio.get_writer(str(cfg['out_dir'] / 'video.mp4'), fps=cfg['fps'] * cfg['video_speed'],
@@ -42,8 +43,9 @@ class Recorder:
     def due(self, t):
         return t >= self.next_frame
 
-    def frame(self, data, fronts, lines):
-        """fronts: front-edge x of every lump (the camera follows their median); lines: (text, big, rgb)."""
+    def frame(self, data, fronts, lines, labels=()):
+        """fronts: front-edge x of every lump (the camera follows their median); lines: (text, big, rgb); labels:
+        (text, x, y) written at world (x, y) in the plan view."""
         from PIL import Image, ImageDraw
         self.next_frame += self.every
         d, cfg = self.d, self.cfg
@@ -56,7 +58,19 @@ class Recorder:
         dr = ImageDraw.Draw(img)
         for i, (text, big, rgb) in enumerate(lines):
             dr.text((16, 12 + 32 * i), text, font=self.font if big else self.small, fill=rgb)
+        for text, x, y in labels:                   # the plan view is orthographic: world (x, y) -> pixels
+            u, w = self.plan_px(x, y)
+            box = dr.textbbox((u, w), text, font=self.small, anchor='mm')
+            dr.rectangle((box[0] - 3, box[1] - 2, box[2] + 3, box[3] + 2), fill=(255, 255, 255))
+            dr.text((u, w), text, font=self.small, fill=(10, 10, 10), anchor='mm')
         self.writer.append_data(np.asarray(img))
+
+    def plan_px(self, x, y):
+        """Pixel of world (x, y) in the plan view (its camera looks straight down, x to the right, y up)."""
+        h = self.cfg['top_h']
+        scale = h / self.top_extent
+        return (self.cfg['width'] / 2 + (x - self.top_pos[0]) * scale,
+                self.iso_h + h / 2 - (y - self.top_pos[1]) * scale)
 
     def close(self):
         self.writer.close()
@@ -65,34 +79,45 @@ class Recorder:
 
 
 def overlay(line):
-    """The text lines over the video, from the running line (sim.line.Line): (text, big, rgb)."""
-    cfg, t, face, feeder = line.cfg, line.t, line.face, line.feeder
-    n_total, n_went = len(line.lumps), len(line.feed_witness.went)
-    lines = [('主带 %.2f m/s  缓冲带 %.2f m/s  计量带 %.2f m/s  t=%5.1f s'
-              % (cfg['v_belt'], cfg['buffer_speed'], cfg['station_speed'], t), True, (15, 20, 30)),
-             ('尾缘过线%d/%d  同时过线%.2f s  主带驱动%.0f%%  犁面：%s'
-              % (sum(1 for L in line.lumps if L.pass_t is not None), n_total, line.trace.together['s'],
-                 100 * line.belts.main.f,
-                 FACE_PHASE_ZH[face.phase] + (' %.0f s' % (t - face.t0) if face.phase == 'hold' else '')),
-              False, (30, 40, 55))]
-    state = ('点动（把挂在边上的料送下去）' if feeder.jog is not None
-             else '预送（下一块送到慢走区）' if feeder.staging
-             else '停（等前面的料快出漏斗）' if feeder.predict and feeder.phase == 'stopped'
-             else FEEDER_PHASE_ZH[feeder.phase]) + (
-        '（慢走）' if feeder.phase == 'feeding' and 0. < feeder.goal < 1. and feeder.jog is None else '') + (
-        '（缓冲带满，暂停）' if feeder.paused else '')
-    lines.append(('给料带：%s  第 %d 次放料  已放 %d/%d 块' % (state, len(feeder.releases), n_went, n_total),
-                  False, (30, 90, 70) if feeder.phase == 'feeding' else (90, 90, 100)))
+    """The text lines over the video, from the running line (sim.line.Line): (text, big, rgb). Live readings only
+    (user, 2026-10-06: 只要实时的必要数据): time, the feed belt's actual speed and what its controller is doing, the drop
+    beam S1 as its controller reads it, every lump's centroid against the head edge, then the station."""
+    cfg, t, face, feeder, d = line.cfg, line.t, line.face, line.feeder, line.data
+    v = max(0., line.belts.feed.f * cfg['feeder_speed'])         # the brake leaves it at -0.0
+    state = ('点动' if feeder.jog is not None else '预送' if feeder.staging else '暂停' if feeder.paused
+             else '前送' if feeder.phase == 'feeding' and feeder.goal >= 1. else '慢走' if feeder.phase == 'feeding'
+             else '停')
+    beam = line.sensors.beams['beam_feed'].blocked
+    head = 't = %6.2f s    给料带 %.3f m/s %s    S1 %s' % (t, v, state, '挡' if beam else '通')
+    if face.phase != 'idle':
+        head += '    犁面 %s' % FACE_PHASE_ZH[face.phase] + (' %.0f s' % (t - face.t0) if face.phase == 'hold' else '')
+    x1 = line.d['feeder']['x1']
+    gone = dict(sorted='落仓', taken_off='移出', dropped='掉落')
+
+    def where(L):
+        if L.state in gone:
+            return gone[L.state]
+        dx = 1000. * (float(d.xipos[L.body][0]) - x1)
+        return '%+.0f mm' % dx if abs(dx) < 1000. else '%+.2f m' % (dx / 1000.)
+    lines = [(head, True, (15, 20, 30)),
+             ('质心−机头边缘  ' + '   '.join('%d: %s' % (L.k, where(L)) for L in line.lumps), False, (30, 40, 55))]
     return lines + station_lines(line.station)
+
+
+def plan_labels(line):
+    """Each lump's number at its centroid, for the plan view: (text, x, y), lumps still on the machine."""
+    d = line.data
+    return [(str(L.k), float(d.xipos[L.body][0]), float(d.xipos[L.body][1])) for L in line.lumps
+            if L.state not in ('sorted', 'taken_off', 'dropped')]
 
 
 def station_lines(s):
     """The station's states, and the last measured item."""
     where = lambda st: ' '.join('#%d%s' % (it['item'] + 1, STAGE_ZH.get(it['stage'], it['stage']))
                                 for it in s.line if it['stage'] in st) or '空'
-    flags = ('（停，等计量带）' if s.b_goal == 0. and not s.frozen else '') + \
-            ('  （上游暂停）' if s.section_held and not s.frozen else '') + \
-            ('  【全线暂停：%s】' % (s.alarm['why'] if s.alarm else '视觉') if s.frozen else '')
+    flags = ('（停）' if s.b_goal == 0. and not s.frozen else '') + \
+            ('  上游暂停' if s.section_held and not s.frozen else '') + \
+            ('  全线暂停：%s' % (s.alarm['why'] if s.alarm else '视觉') if s.frozen else '')
     lines = [('缓冲带：%s  计量带：%s  排料板：%s %.0f°%s'
               % (where(('buffer',)), where(('transfer', 'onm', 'measure', 'decided', 'discharge', 'hold')),
                  PLATE_ZH.get(s.plate, s.plate), s.plate_deg, flags), False, (60, 45, 110))]
