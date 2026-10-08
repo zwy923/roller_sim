@@ -59,7 +59,7 @@
 
 ## 2026-10-05 删掉和搬走的东西
 
-删掉的命令行选项见 [README](../README.md#2026-10-05-结构重构)。旧模块到新位置：
+旧命令行选项以对应版本为准；当前可用选项见 `python plough.py --help`。旧模块到新位置：
 
 | 重构前 | 重构后 |
 |---|---|
@@ -75,7 +75,7 @@
 
 常量改名（旧名字不再识别）：`singulator.station.WEIGH_MAX_S` → `sensing.weigher.WEIGH_MAX_S`，`singulator.station.STOP_BACK` → `machine.station.STOP_BACK`，`singulator.station.APPROACH` → `control.station.APPROACH`。`perception.SPLIT_PAD` / `GHOST_S` 设为 `None` 的旧行为已删除，只能在重构前的代码上跑。
 
-**重构前的代码**在 git 标签 `before-refactor`（提交 `77c8907`），连同 S6 / S7 当时的源码快照、任务清单和过程记录；2026-10-06 起这些不在工作目录里，取用方法见 [README](../README.md#2026-10-05-结构重构)。
+**重构前的代码**在 git 标签 `before-refactor`（提交 `77c8907`），连同 S6 / S7 当时的源码快照、任务清单和过程记录。用 `git show before-refactor:README.md` 查看当时用法；复现需单独检出该标签，并按该版说明安装和运行。原始结果不在 Git 中。
 
 ## 行为是否变了：怎么验证的
 

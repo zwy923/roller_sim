@@ -4,7 +4,7 @@
 
 本页保留 2026-10-05 的完整实验过程、表格和核对记录。文中的 `out*` 位于 `experiments/results/`（不进 git）；命令从项目根目录运行。
 
-> 2026-10-06：文中提到的 `snapshots/`（源码快照）、`jobs/`（任务清单）、`archive/` 和第 S6 节的脚本已不在工作目录里，在 git 标签 `before-refactor` 上，取用方法见项目 [README](../../README.md#2026-10-05-结构重构)；本页原在 `experiments/s7/REPORT.md`；脚本都在 `experiments/`，去掉了 `s7_` 前缀（`s7_compare.py` 改叫 `diff.py`），S7 的线在 `jobs.py` 里叫 `beam_stop`。第 S6 节的原始结果已删除。
+> 2026-10-06：文中提到的 `snapshots/`（源码快照）、`jobs/`（任务清单）、`archive/` 和第 S6 节的脚本已不在工作目录里，在 git 标签 `before-refactor` 上，取用方法见 [代码结构说明](../ARCHITECTURE.md#2026-10-05-删掉和搬走的东西)；本页原在 `experiments/s7/REPORT.md`；脚本都在 `experiments/`，去掉了 `s7_` 前缀（`s7_compare.py` 改叫 `diff.py`），S7 的线在 `jobs.py` 里叫 `beam_stop`。第 S6 节的原始结果已删除。
 
 ## S7. 基线能不能让每块料独立测量（579 批）
 

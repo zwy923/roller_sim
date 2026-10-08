@@ -48,4 +48,4 @@ python experiments/analyze.py experiments/results/out_valid_b experiments/result
 
 S8 的 1080 批跑在云端会话的容器里（`runs/`），容器回收后就没有了；表格在 [S8 完整记录](../docs/history/EXPERIMENTS_S8.md)，末尾有复现命令。
 
-S7 当时用的源码快照（`f6794775`）、任务清单和第 S6 节的脚本在 git 标签 `before-refactor` 上，取用方法见项目 [README](../README.md#2026-10-05-结构重构)。
+S7 当时用的源码快照（`f6794775`）、任务清单和第 S6 节的脚本在 git 标签 `before-refactor` 上，取用方法见 [代码结构说明](../docs/ARCHITECTURE.md#2026-10-05-删掉和搬走的东西)。
