@@ -3,13 +3,13 @@
     lane -> main belt head edge -> buffer belt B (one step down) -> measuring belt M (weigh + volume) -> separator
 
   * B: station_w wide, buffer_len long, its top station_step BELOW the main belt, from the main belt's head edge,
-    running at buffer_speed; a lump tips onto it once its centroid passes that edge. Entry beam S2 across B S2_X
-    past the edge; staging beam S3 far enough before B's far end for B to stop a lead that cuts it (STOP_BACK at
+    running at buffer_speed; a lump tips onto it once its centroid passes that edge. Staging beam S3 far enough
+    before B's far end for B to stop a lead that cuts it (STOP_BACK at
     least), STOP_Z above it;
   * M: same width and height as B, measure_len long, a flat joint with B. Load cells carry M and its skirts; the
     volume scanner (three depth heads, machine/sensors.py) over it;
   * the flip separator (machine/separator.py), as wide as M, with side walls (separator_wall high) riding on the
-    plate, behind it; beam S4 across the drop gap under the plate inlet.
+    plate, behind it; the plate-zone camera confirms that its path is empty.
 
 Geometry is pure (no MuJoCo). The control of all three is control/station.py; what weighs and scans is sensing/.
 """
@@ -30,15 +30,7 @@ STOP_BACK = .15       # m: the staging beam is at least this far before B's far 
                       # its stop distance plus the camera latency plus STAGE_ROOM) ...
 STOP_Z = .05          # ... this high above B (a flat lump is at least 6 cm thick)
 STAGE_ROOM = .05      # m: a staged lead stops at least this far short of B's far end
-S2_X = .65            # m: S2 lies this far past the head edge, where a lump lies flat on B again ...
-S2_Z = .015           # ... this high above B: low enough that two touching lumps mostly leave a gap under their
-                      # junction. 0.10 m (half the 5 cm step) until 2026-09-30: a lump's rear crossed it still in the
-                      # air (seed 392). 0.35 m then; with the 10 cm step a lump touches the beam, bounces clear of it
-                      # for 0.22-0.34 s and comes down again there -- two interruptions for one lump (6 of 160 in the
-                      # buffer sweep, 2026-10-01) -- so 0.65 m
-S2_ROOM = .30         # m: S2 lies at least this far before S3
-GANGUE_X = .25        # m: the gangue beam is this far past M's head edge ...
-GANGUE_DZ = .45       # ... and this far below the plate inlet (under the plate's closing sweep)
+PLATE_ZONE_DEPTH = .45  # m: the camera's plate zone extends at least this far below the inlet, plus 5 cm
 GAP = .02             # m: M's head edge -> plate inlet
 DROP = .02            # m: M's top -> rib tops at the plate inlet
 
@@ -56,7 +48,7 @@ def geometry(cfg, x1, y_c):
     span = math.hypot(cfg['size_long_max'], cfg['size_max'])       # plan diagonal of a flat-lying lump, bound
     stop = cfg['station_speed'] * (RAMP_S / 2 + SAMPLE_S)
     stop_back = max(STOP_BACK, cfg['buffer_speed'] * (RAMP_S / 2 + SAMPLE_S + sensors.LATENCY_S) + STAGE_ROOM)
-    need = dict(buffer_len=max(CLEAR + span, S2_X + S2_ROOM) + stop_back, measure_len=CLEAR + stop + span + FRONT_MARGIN)
+    need = dict(buffer_len=CLEAR + span + stop_back, measure_len=CLEAR + stop + span + FRONT_MARGIN)
     for k, v in need.items():
         if cfg[k] < v:
             raise ValueError('--%s %.3f m cannot hold one lump (%.3f m plan extent) wholly: needs %.3f m'
@@ -71,17 +63,15 @@ def geometry(cfg, x1, y_c):
     closed, opened = separator.state(sep, sep.closed_deg), separator.state(sep, sep.open_deg)
     mu = cfg['separator_friction']
     inlet = world(closed['inlet'])
-    gz = inlet[2] - GANGUE_DZ
     out_c, in_o = world(closed['outlet']), world(opened['inlet'])
     # the plate's path: where a lump sent over the plate may still be while the plate must not move
-    zone = ((m1, y_c - cfg['station_w'] / 2 - .10, min(gz, out_c[2]) - .05),
+    zone = ((m1, y_c - cfg['station_w'] / 2 - .10, min(inlet[2] - PLATE_ZONE_DEPTH, out_c[2]) - .05),
             (out_c[0] + .10, y_c + cfg['station_w'] / 2 + .10, inlet[2] + .50))
     return dict(sep=sep, width_m=cfg['station_w'], y_c=y_c, top_z=top, step_m=cfg['station_step'],
                 speed_m_s=cfg['station_speed'], buffer_speed_m_s=cfg['buffer_speed'], ramp_s=RAMP_S,
                 buffer=dict(x0=b0, x1=b1, length_m=cfg['buffer_len'], speed_m_s=cfg['buffer_speed']),
                 measure=dict(x0=m0, x1=m1, length_m=cfg['measure_len'], scan_s=cfg['scan_s']),
-                beam_in=dict(x=b0 + S2_X, z=top + S2_Z), beam_stop=dict(x=b1 - stop_back, z=top + STOP_Z),
-                beam_gangue=dict(x=m1 + GANGUE_X, z=gz),
+                beam_stop=dict(x=b1 - stop_back, z=top + STOP_Z),
                 plate_zone=[[round(float(v), 4) for v in p] for p in zone],
                 longest_plan_extent_m=round(span, 4), stop_distance_m=round(stop, 4),
                 separator=dict(width_m=sep.width, rib_count=sep.rib_count, inlet_height_m=sep.inlet_height,

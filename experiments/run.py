@@ -83,7 +83,7 @@ def summary(job, r, wall):
                           route=it.get('route'), route_as_ideal=it.get('route_as_ideal'),
                           mass_error_pct=it.get('mass_error_pct'), weigh_wait_s=it.get('weigh_wait_s'),
                           n_obj_max=it.get('n_obj_max'), n_est_max=it.get('n_est_max'), split_from=it.get('split_from'),
-                          joined=it.get('joined'), handover=it.get('handover'), t_in_s=it.get('t_in_s'),
+                          joined=it.get('joined'), t_in_s=it.get('t_in_s'),
                           t_stop_s=it.get('t_stop_s'), t_hold_s=it.get('t_hold_s'), bins=it.get('bins')))
     return dict(config=job['config'], tag=job['tag'], argv=job['argv'], set=job.get('set'),
                 layout=r['config']['layout'],

@@ -170,7 +170,7 @@ class Line:
         # ---- stall -> retract, or stop for the operator ------------------------------------------------
         if sup.judge(t, view):
             return 'stop'
-        if t > cfg['ramp'] + DONE_AFTER_S and all(L.state in END_STATES for L in lumps):
+        if t > cfg['ramp'] + DONE_AFTER_S and all(L.state in END_STATES for L in lumps) and not station.path_pending:
             return 'done'
         return None
 

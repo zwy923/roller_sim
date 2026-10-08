@@ -15,7 +15,7 @@ Same day (user): the station became the line itself (the gated mainline was dele
 than the main belt and pull apart lumps that come over the head edge together.
 
 What it reads (--sensing vision): the camera objects of sensing.vision.Vision (estimated outline, extents,
-outline centroid, velocity, confidence, estimated lump count, track lineage), the beams S1-S4 as debounced
+outline centroid, velocity, confidence, estimated lump count, track lineage), the beams S1 and S3 as debounced
 signals, the weigher's result, the volume device's verdict, the belt drives' own speed and the plate angle. It
 never reads the true state. The verification of its decisions against the truth is written into its record by a
 witness (verify/station.py) that it calls at fixed points; without one (NoWitness) it runs the same.
@@ -28,9 +28,6 @@ two items, each keeping only its own objects.
 
 Void = the measurement cannot stand for one lump. Reasons (all recorded, any one is enough):
   multi        the item had two objects at once, or an object the cameras count as two lumps;
-  handover     S2 did not confirm the hand-over as one lump: no interruption over the stretch of B the item
-               passed S2 on, more interruptions than objects, or one interruption blocked over more belt travel
-               than a single lump can be;
   outside      while weighing, the item's outline is not inside the weigh zone with ISO_MARGIN, or another
                object is within ISO_GAP of it (it may lean on something off the scale);
   unsteady     the weigher has a result but refuses it: no steady reading in time (--weigh-model steady only; the
@@ -68,8 +65,8 @@ Control (as in the second version, now on the sensors):
         0.8 m/s a large round lump cut the 5 cm high beam late and its nose came to rest over the joint, in the
         scanner's zone: the item being weighed was void), and it is not thrown onto the slower M;
   plate  moves to the route's position the moment the route is known, once everything sent before has left
-     its path: S4 has seen a gangue lump fall through and is clear again AND the cameras see the plate zone
-     empty (coal: the zone empty). Not cleared within PATH_TIMEOUT_S after its discharge: stop the line.
+     its path: the healthy cameras see the plate zone empty, for both coal and gangue. Not cleared within
+     PATH_TIMEOUT_S after its discharge: stop the line.
 Alarms that stop everything (all belts, the plate stays): vision not healthy (camera outage, a track lost
 and not found again) -- the line resumes once it is healthy again, and stops for good after FREEZE_MAX_S;
 a beam diagnosed dirty, dead or blocked too long, and a plate-path timeout -- the run stops there (no
@@ -81,7 +78,7 @@ import math
 
 from ..config import SAMPLE_S
 from ..geom2d import box_gap
-from ..machine import sensors, station as hw
+from ..machine import station as hw
 from ..sensing import vision
 
 STAGE_CAM = .03       # m: the cameras see the lead's front this far past S3 while S3 is clear: stop B anyway
@@ -102,17 +99,9 @@ ISO_MARGIN = .02      # m: while weighing the item's outline keeps this far insi
 ISO_GAP = .05         # m: ... and no other object comes this close to it
 DENSITY_OK = (1000., 3200.)   # kg/m3: a density outside this is not a lump weighed whole
 ZERO_CLEAR = .10      # m: the weigher tracks its zero only with nothing this close to the measuring belt
-HANDOVER_LEN = .70    # m: one S2 interruption over this much belt travel = more than one lump in a row (a
-                      # single lump spans at most ~0.63 m in plan at the 0.50 m long-axis cap)
-HANDOVER_MIN = .05    # m: an S2 interruption over less belt travel than this is a touch or a bounce, not a lump
-                      # (the smallest lump blocks the low beam over about 0.1 m; seed 4001: a 2.8 cm blip)
-HANDOVER_JOIN = .08   # m: S2 clear for less than this much buffer belt travel between two blocks = one
-                      # interruption: a lump still rocking from the drop lifts off the low beam (seed 392: 6.4 cm)
-HANDOVER_JOIN_S = .20  # s: ... or for less than this long: a lift-off lasts about 0.16 s whatever B's speed, so at
-                      # 0.6-0.8 m/s it spans 10-13 cm of travel (oblique 6001, 2026-09-30)
 PATH_TIMEOUT_S = 6.   # s: a sent item must be out of the plate's path this long after its discharge started
 FREEZE_MAX_S = 5.     # s: the vision not healthy this long (not found again): stop the run
-DEAD_AFTER = 2       # hand-overs (S2) or releases (S1) in a row without the beam: the beam is dead
+DEAD_AFTER = 2       # releases (S1) in a row without the beam: the beam is dead
 ACROSS_IN = .10      # m: the cameras see a lump's body across a beam when the line is this far inside its outline
 
 
@@ -170,11 +159,15 @@ class Station:
         self.events, self.held_s, self.buffer_stopped_s, self.frozen_s = [], 0., 0., 0.
         self.key, self.since = None, 0.
         self.frozen, self.frozen_since = False, None
-        self.s2, self.b_odo, self.s2_missed = [], 0., 0   # S2 interruptions; buffer belt odometer; misses in a row
         self.objs = {}
 
     def _stage(self, *stages):
         return [it for it in self.line if it['stage'] in stages]
+
+    @property
+    def path_pending(self):
+        """A discharged item still needs the plate-zone camera's clearance confirmation."""
+        return bool(self._stage('discharge')) or any('t_clear_s' not in it for it in self.sent)
 
     @property
     def weighing(self):
@@ -220,7 +213,6 @@ class Station:
             h.append((t, o['cx']))
             while len(h) > 2 and h[1][0] < t - HANG_S - .02:
                 h.pop(0)
-        self._s2_log(t, beams['beam_in'])
 
         # ---- objects -> items --------------------------------------------------------------------
         self._assign(t, objs)
@@ -232,7 +224,6 @@ class Station:
                 it['n_obj_max'] = max(it['n_obj_max'], len(it['objs']))
                 it['n_est_max'] = max(it['n_est_max'], max(o['n_est'] for o in it['objs']))
         self._split(t)
-        self._handover(t, beams['beam_in'])
 
         # ---- stage changes on B and M ------------------------------------------------------------
         on_m = lambda it: it['stage'] in ('transfer', 'onm', 'measure', 'decided', 'discharge', 'hold')
@@ -266,7 +257,7 @@ class Station:
             self.sent.append(it)
 
         # ---- the plate's path, and what has landed ------------------------------------------------
-        path_clear = self._path(t, view, beams['beam_gangue'])
+        path_clear = self._path(t, view)
         # ---- M: tare while empty, weigh and scan at rest -----------------------------------------------
         if not self.frozen and not any(on_m(e) for e in self.line) \
                 and not any(o['x1'] > x_j - ZERO_CLEAR and o['x0'] < m_end + ZERO_CLEAR for o in objs.values()):
@@ -326,7 +317,7 @@ class Station:
     # ---- items -------------------------------------------------------------------------------------
     def _new_item(self, t):
         it = dict(item=len(self.items), tids=set(), now=[], objs=[], joined=[], t_in_s=round(t, 3), stage='buffer',
-                  reasons=[], n_obj_max=0, n_est_max=0, handover=dict(done=False))
+                  reasons=[], n_obj_max=0, n_est_max=0)
         self.items.append(it)
         self.line.append(it)
         return it
@@ -404,71 +395,18 @@ class Station:
             behind, ahead = objs[:cut], objs[cut:]
             new = dict(item=len(self.items), tids={o['tid'] for o in behind}, now=[o['tid'] for o in behind],
                        objs=behind, joined=[], t_in_s=it['t_in_s'], stage='buffer', reasons=[],
-                       n_obj_max=len(behind), n_est_max=max(o['n_est'] for o in behind), handover=dict(done=False),
+                       n_obj_max=len(behind), n_est_max=max(o['n_est'] for o in behind),
                        split_from=it['item'])
             self.items.append(new)
             self.line.insert(self.line.index(it) + 1, new)
             it.update(tids={o['tid'] for o in ahead}, now=[o['tid'] for o in ahead], objs=ahead,
                       n_obj_max=len(ahead), n_est_max=max(o['n_est'] for o in ahead))
             it.setdefault('split', []).append(new['item'])
-            if it['handover']['done'] and it['reasons'] == ['handover']:
-                it['reasons'], it['handover'] = [], dict(done=False)   # judged together: judge again, alone
-                it.pop('reason_info', None)
             for e in (it, new):
                 e['box'] = (min(o['x0'] for o in e['objs']), max(o['x1'] for o in e['objs']),
                             min(o['y0'] for o in e['objs']), max(o['y1'] for o in e['objs']))
             self.counts['splits'] += 1
             self._event(t, 'item_split', item=it['item'], new=new['item'])
-
-    def _s2_log(self, t, s2):
-        """S2 interruptions on the buffer belt odometer, with the belt travel while blocked; a clear over less
-        than HANDOVER_JOIN of travel or HANDOVER_JOIN_S between two blocks is one interruption (a lump lifting
-        off the low beam after the drop, a rocking lump, or B stopped)."""
-        step = self.b * self.vb * SAMPLE_S
-        self.b_odo += step
-        log = self.s2
-        if s2.blocked:
-            if not log or (log[-1]['t1'] is not None and self.b_odo - log[-1]['odo1'] > HANDOVER_JOIN
-                           and t - log[-1]['t1'] > HANDOVER_JOIN_S):
-                log.append(dict(t0=round(t, 3), t1=None, odo0=self.b_odo, odo1=None, blocked=0.))
-            elif log[-1]['t1'] is not None:
-                log[-1]['t1'] = log[-1]['odo1'] = None        # a lift-off or a bounce: the same interruption goes on
-            log[-1]['blocked'] += step
-        elif log and log[-1]['t1'] is None:
-            log[-1]['t1'], log[-1]['odo1'] = round(t, 3), self.b_odo
-
-    def _handover(self, t, s2):
-        """S2 confirms each hand-over onto B once the item's rear is past the beam: the interruptions over the
-        stretch of B it passed the beam on, as many as its objects, none blocked longer than one lump. A lump
-        rides B from the beam on, so it passed the beam where the odometer read b_odo minus its distance past
-        the beam (the camera's position is LATENCY_S old: B moved on meanwhile)."""
-        bx = self.g['beam_in']['x']
-        lag = self.b * self.vb * sensors.LATENCY_S
-        pad = self.vm + lag + .02
-        for it in self.line:
-            h = it['handover']
-            if h['done'] or 'box' not in it or it['box'][0] <= bx + self.vm + .01:
-                continue
-            lo = self.b_odo - (it['box'][1] + lag - bx) - pad          # its front at the beam
-            hi = self.b_odo - (it['box'][0] + lag - bx) + pad          # its rear at the beam
-            if self.s2 and self.s2[-1]['t1'] is None and self.s2[-1]['odo0'] <= hi:
-                continue                                               # still blocked over its stretch
-            seen = [s for s in self.s2 if s['t1'] is not None and s['odo1'] >= lo and s['odo0'] <= hi]
-            ints = [s for s in seen if s['blocked'] >= HANDOVER_MIN]
-            travel = max((s['blocked'] for s in ints), default=0.)
-            h.update(done=round(t, 3), interruptions=len(ints), blips=len(seen) - len(ints),
-                     longest_travel_m=round(travel, 3))
-            self.s2_missed = self.s2_missed + 1 if not ints else 0
-            if self.s2_missed >= DEAD_AFTER and s2.alarm is None:
-                s2.alarm = dict(t_s=round(t, 3), beam=s2.name, why='dead', stop=True,
-                                note='%d hand-overs in a row the cameras saw and S2 did not' % self.s2_missed)
-            if not ints:
-                self._void(it, 'handover', detail='S2 saw nothing')
-            elif len(ints) > max(1, it['n_obj_max']):
-                self._void(it, 'handover', detail='S2 saw %d interruptions, the cameras %d object(s)'
-                           % (len(ints), it['n_obj_max']))
-            elif travel > HANDOVER_LEN:
-                self._void(it, 'handover', detail='one interruption over %.2f m of belt' % travel)
 
     # ---- the plate's path ------------------------------------------------------------------------
     def _in_zone(self, view):
@@ -476,10 +414,9 @@ class Station:
         return [o for o in view.values() if o['x1'] > x0 and o['x0'] < x1 and o['y1'] > y0 and o['y0'] < y1
                 and o['ztop'] > z0]
 
-    def _path(self, t, view, s4):
-        """Everything sent has left the plate's path: gangue -- S4 saw it fall and is clear again, and the
-        cameras see nothing of it or of anything unknown in the plate zone; coal -- the zone empty the same
-        way. Objects of items sent later do not count against an earlier one. Not out within PATH_TIMEOUT_S
+    def _path(self, t, view):
+        """The healthy cameras see nothing of the item or of anything unknown in the plate zone.
+        Objects of items sent later do not count against an earlier one. Not out within PATH_TIMEOUT_S
         of its discharge: stop the line."""
         zone = self._in_zone(view)
         order = {it['item']: i for i, it in enumerate(self.sent)}
@@ -489,15 +426,13 @@ class Station:
                 continue
             mine = [o for o in zone if owner(o) is None or order[owner(o)['item']] <= order[it['item']]]
             occupied = bool(mine) or not view.health['ok']
-            fell = s4.blocks_since(it['t_discharge_s']) > 0 and not s4.blocked
-            if not occupied and (fell or it['route'] == 'coal'):
+            if not occupied:
                 it['t_clear_s'] = round(t, 3)
-                it['path_confirmed_by'] = 'S4 + plate-zone camera' if it['route'] == 'gangue' else 'plate-zone camera'
+                it['path_confirmed_by'] = 'plate-zone camera'
             elif t - it['t_discharge_s'] > PATH_TIMEOUT_S and self.fault is None:
                 self.fault = dict(t_s=round(t, 2), reason='separator_path_timeout', item=it['item'],
-                                  route=it['route'], s4_interruptions=s4.blocks_since(it['t_discharge_s']),
-                                  s4_blocked=s4.blocked, zone_occupied=occupied,
-                                  note='the plate path was not confirmed clear: S4 alone does not prove it')
+                                  route=it['route'], zone_occupied=occupied,
+                                  note='the plate-zone camera did not confirm the path clear')
         self.witness.landed(t, self.sent)
         return all('t_clear_s' in it for it in self.sent)
 
@@ -585,9 +520,8 @@ class Station:
         FREEZE_MAX_S, then the run stops)."""
         d, g = self.d, self.g
         fd = d['feeder']
-        belt = dict(beam_feed=self.u, beam_in=self.b, beam_stop=self.b, beam_gangue=1.)
-        x_on = dict(beam_feed=fd['x1'], beam_in=g['buffer']['x0'], beam_stop=g['buffer']['x0'],
-                    beam_gangue=g['measure']['x1'])
+        belt = dict(beam_feed=self.u, beam_stop=self.b)
+        x_on = dict(beam_feed=fd['x1'], beam_stop=g['buffer']['x0'])
         for name, b in beams.items():
             near = [o for o in view.values() if o['x0'] - .05 < b.x < o['x1'] + .05]
             # a lump's body across the line (not a raised nose or tail: ACROSS_IN inside its outline both ways),
@@ -596,9 +530,8 @@ class Station:
                       and o['conf'] >= vision.CONF_OK]
             seen_clear = view.health['ok'] and not near
             expected = name == 'beam_stop' or belt[name] < .5    # staged, or the belt under it stopped
-            # 'dead' by the cameras only for S3: at S1 and S2 a lump still overhanging the edge above the beam
-            # looks the same from above as one that went over; those two are judged dead by repeated misses
-            # (the feed belt's beam-miss stops, S2 hand-overs it did not see)
+            # 'dead' by the cameras only for S3: a lump overhanging the edge above S1 can look like one that went
+            # over; S1 is judged dead by repeated releases it did not see
             a = b.diagnose(t, seen_clear, bool(across) and name == 'beam_stop', expected)
             if a is not None and self.alarm is None:
                 self.alarm = dict(a)
@@ -706,7 +639,7 @@ class Station:
         measure = dict(g['measure'], **self.weigher.describe(), **self.scanner.describe())
         return dict(g, measure=measure,
                     void_rules=dict(density_ok_kg_m3=list(DENSITY_OK), iso_margin_m=ISO_MARGIN, iso_gap_m=ISO_GAP,
-                                    handover_len_m=HANDOVER_LEN, path_timeout_s=PATH_TIMEOUT_S, **self.weigher.limits(),
+                                    path_timeout_s=PATH_TIMEOUT_S, **self.weigher.limits(),
                                     on_void='hold: no discharge, no plate move, no release; the simulation then takes '
                                             'the lumps off the line (manual re-measuring is not modelled)'))
 
@@ -733,7 +666,6 @@ class Station:
                                 void_discharged=sum(it['void'] and 't_discharge_s' in it for it in done)),
                     upstream_held_s=round(self.held_s, 2), buffer_stopped_s=round(self.buffer_stopped_s, 2),
                     frozen_s=round(self.frozen_s, 2), fault=self.fault,
-                    s2_interruptions=[{k: (round(v, 3) if isinstance(v, float) else v) for k, v in e.items()} for e in self.s2],
                     final=dict(plate=self.plate, plate_deg=round(self.plate_deg, 2),
                                items=[(it['item'], it['stage']) for it in self.line]),
                     control='void items are held on the measuring belt (no discharge, no plate move, no release), '
@@ -742,7 +674,7 @@ class Station:
                             'lead item at S3 (or where the cameras see it past S3) while the measuring belt is busy; '
                             'the measuring belt weighs (indicator: %.1f s average steady within %.0f %% for %.1f s) and '
                             'scans (%.1f s) at the same time; route = gangue if mass/volume >= %.0f kg/m3; the plate '
-                            'moves as soon as the route is known and S4 plus the plate-zone camera say its path is '
+                            'moves as soon as the route is known and the healthy plate-zone camera says its path is '
                             'clear; the discharge starts once the plate will be in position %.1f s before the lump '
                             'reaches it' % (w['filter_s'], 100 * w['steady_band'], w['steady_s'], self.cfg['scan_s'],
                                             self.cfg['sort_density'], PLATE_MARGIN_S))

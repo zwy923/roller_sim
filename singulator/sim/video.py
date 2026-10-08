@@ -13,7 +13,7 @@ FACE_PHASE_ZH = dict(idle='常位', out='撤离中', hold='撤离保持', back='
 STAGE_ZH = dict(buffer='缓冲', transfer='上计量带', onm='在计量带上', measure='称重+测体积', decided='等排料板',
                 discharge='排出', hold='作废停住')
 PLATE_ZH = dict(closed='落板（煤）', opening='抬起中', open='抬起（矸）', closing='回落中')
-REASON_ZH = dict(multi='多块', handover='交接未确认', outside='搭秤外', unsteady='读数不稳', scan='扫描无效',
+REASON_ZH = dict(multi='多块', outside='搭秤外', unsteady='读数不稳', scan='扫描无效',
                  implausible='密度不合理', tare='秤未清空', track_lost='跟踪丢失')
 
 

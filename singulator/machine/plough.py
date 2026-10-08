@@ -295,13 +295,10 @@ def skirts(cfg, d):
 
 
 def markers(cfg, d):
-    """Drawn only: the lane's exit plane, the measuring plane (the head edge), and with the 'lane' release rule
-    the feed belt's next-release line (every released lump's rear must be past it)."""
+    """With the 'lane' release rule, draw its next-release line (every released lump's rear must be past it).
+    The exit and head-edge planes remain in the statistics, without visual markers."""
     y = cfg['lane_y'] + cfg['lane_w'] / 2
-    out = ['<geom name="exit_line" type="box" size=".006 %.4f .004" pos="%.4f %.4f .006" '
-           'contype="0" conaffinity="0" rgba="1 .6 .15 .85"/>' % (cfg['lane_w'] / 2, d['exit_x'], y),
-           '<geom name="final_line" type="box" size=".006 %.4f .004" pos="%.4f %.4f %.4f" '
-           'contype="0" conaffinity="0" rgba="1 .15 .15 .9"/>' % (cfg['lane_w'] / 2, d['final_x'], y, .006)]
+    out = []
     if cfg['feeder_release'] == 'lane':
         out.append('<geom name="release_line" type="box" size=".006 %.4f .004" pos="%.4f %.4f .006" '
                    'contype="0" conaffinity="0" rgba=".15 .45 1 .9"/>' % (cfg['lane_w'] / 2, d['lane_out_start'], y))

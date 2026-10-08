@@ -1,4 +1,4 @@
-"""The sensors of the line as one set: the cameras, the four beams, the volume scanner and the weigher, fed with
+"""The sensors of the line as one set: the cameras, the two beams, the volume scanner and the weigher, fed with
 the scene.
 
 This is where the true state becomes sensor signals: Sensors.frame() hands the lumps' true outlines and the load on
@@ -26,7 +26,7 @@ def parse_faults(cfg):
                 out.append(dict(kind=kind, n=int(arg)))
             elif kind in ('beam_dirty', 'beam_dead'):
                 name, _, t = arg.partition('@')
-                if name not in ('beam_feed', 'beam_in', 'beam_stop', 'beam_gangue'):
+                if name not in ('beam_feed', 'beam_stop'):
                     raise ValueError(name)
                 out.append(dict(kind=kind, beam=name, t=float(t)))
             elif kind == 'vision_off':
@@ -41,11 +41,11 @@ def parse_faults(cfg):
 
 
 class Sensors:
-    """Vision, the four beams, the scanner and the weigher of the line.
+    """Vision, the two beams, the scanner and the weigher of the line.
 
         vision      the cameras (sensing.vision.Vision); frame(t) returns what the controllers see of them
         feed_view   the feed belt controller's view: the same frame, or the ideal one (--feeder-sensing oracle)
-        beams       {name: sensing.beams.Beam}: beam_feed (S1), beam_in (S2), beam_stop (S3), beam_gangue (S4)
+        beams       {name: sensing.beams.Beam}: beam_feed (S1), beam_stop (S3)
         scanner     the volume device over the measuring belt (sensing.volume)
         weigher     the weighing device of the measuring belt (sensing.weigher), on load_cell
         margin      the position margin the controllers put on camera-judged edges

@@ -187,7 +187,7 @@ PARAMS = {
         P('fault', [], LIST,
           "inject a sensor fault, repeatable: scan_fail:N (the N-th scan, from 0, fails), beam_dirty:NAME@T (reads "
           "blocked from T s), beam_dead:NAME@T (never blocks from T s), vision_off:T0-T1 (every camera dark). NAME: "
-          "beam_feed, beam_in, beam_stop, beam_gangue"),
+          "beam_feed, beam_stop"),
         P('scenario', 'none', SCENARIOS,
           "acceptance scenarios (2026-09-30): 'touching' = two lumps laid touching end to end on the buffer belt at "
           "t = 0, they reach the measuring belt together; 'touching_lane' = the same pair laid in the lane; "

@@ -3,7 +3,7 @@ held, and the controllers on sensor signals.
 
 Run: python checks/station_checks.py            (python checks/station_checks.py Control  -- one class)
 1. Geometry: the buffer belt one step below the main belt from its head edge, the measuring belt flush after
-   it, both 0.70 m wide; the four beams (S2 where a lump lies flat again, low; S3 far enough back for the
+   it, both 0.70 m wide; the two beams (S1 at the feed head; S3 far enough back for the
    buffer belt's stop); the plate zone; the separator docked behind the measuring belt; what is rejected.
 2. Devices: every beam has an emitter and a receiver on its line, every camera region (the feed belt camera
    and the plate zone included) and the measuring zone (two heads) is in view, no device reaches into the
@@ -15,7 +15,7 @@ Run: python checks/station_checks.py            (python checks/station_checks.py
 5. Control on synthetic sensor signals (no physics): a coal lump and a gangue lump through; a void item for
    every reason is HELD -- no discharge, no plate move, no release -- and taken off the line the line runs on;
    an item found good is still held if a lump reaches it while it waits for the plate;
-   the plate path needs S4 and the plate-zone camera, with a timeout; staging and the hand-over during a
+   the plate path needs a healthy plate-zone camera, with a timeout; staging and the hand-over during a
    discharge; the section held only when the buffer cannot take a lump; the line frozen while the cameras are
    not healthy (stopped if that lasts), stopped by a dirty beam; the stall stop. Rules: the two optional ones
    (--weigh-stop centre, --buffer-approach slow). Baseline: the defaults fixed on 2026-10-05 -- the measuring
@@ -45,6 +45,7 @@ from singulator.lumps import make_blocks, set_mass_properties  # noqa: E402
 from singulator.machine import assembly, sensors, separator, station as hw  # noqa: E402
 from singulator.physics.lumps import END_STATES, Lump  # noqa: E402
 from singulator.sensing import beams, vision  # noqa: E402
+from singulator.sensing.suite import parse_faults  # noqa: E402
 from singulator.sensing import weigher as scale  # noqa: E402
 from singulator.sim.scenarios import items_gone  # noqa: E402
 from singulator.verify.station import StationWitness, frame_contacts  # noqa: E402
@@ -54,7 +55,7 @@ D = machine.derive(CFG)
 ST = D['station']
 EDGE, XJ, MEND = ST['buffer']['x0'], ST['buffer']['x1'], ST['measure']['x1']
 TOP, SC = ST['top_z'], ST['sep']
-STOP_X, S2_X = ST['beam_stop']['x'], ST['beam_in']['x']
+STOP_X = ST['beam_stop']['x']
 RATE = (SC.open_deg - SC.closed_deg) / CFG['separator_swing_s']
 
 
@@ -81,17 +82,13 @@ class Geometry(unittest.TestCase):
         self.assertAlmostEqual(MEND - XJ, CFG['measure_len'])
         self.assertAlmostEqual(TOP, -CFG['station_step'])
         self.assertAlmostEqual(ST['y_c'], CFG['lane_y'] + CFG['lane_w'] / 2)
-        self.assertEqual((S2_X, ST['beam_in']['z']), (EDGE + hw.S2_X, TOP + hw.S2_Z))
-        self.assertLessEqual(S2_X + hw.S2_ROOM, STOP_X + 1e-9)     # a lump lies flat past S2 before S3
         b_stop = CFG['buffer_speed'] * (hw.RAMP_S / 2 + SAMPLE_S + sensors.LATENCY_S)
         self.assertAlmostEqual(XJ - STOP_X, max(hw.STOP_BACK, b_stop + hw.STAGE_ROOM))
         self.assertAlmostEqual(ST['beam_stop']['z'], TOP + hw.STOP_Z)
-        self.assertTrue(MEND < ST['beam_gangue']['x'] < sp['pivot'][0])
-        self.assertLess(ST['beam_gangue']['z'], sp['inlet'][2] - .3)  # under the plate's closing sweep
         (zx0, _, zz0), (zx1, _, _) = ST['plate_zone']
         self.assertAlmostEqual(zx0, MEND, places=3)
         self.assertGreater(zx1, sp['outlet_closed'][0])
-        self.assertLess(zz0, min(ST['beam_gangue']['z'], sp['outlet_closed'][2]))
+        self.assertLess(zz0, min(sp['inlet'][2] - hw.PLATE_ZONE_DEPTH, sp['outlet_closed'][2]))
         self.assertAlmostEqual(sp['inlet'][0], MEND + hw.GAP, places=3)
         self.assertAlmostEqual(sp['inlet'][2] + SC.rib_height, TOP - hw.DROP, places=3)
         self.assertAlmostEqual(sp['inlet'][2] - sp['floor_z'], 1.45, places=3)
@@ -105,7 +102,7 @@ class Geometry(unittest.TestCase):
                      ['--station-step', '0'], ['--sort-density', '-1']):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 derive(*args)
-        for args in (('--buffer-speed', '4'), ('--buffer-len', '.9')):   # room for S2, S3 and B's stop
+        for args in (('--buffer-speed', '4'), ('--buffer-len', '.9')):   # room for a whole lump and B's stop
             with self.subTest(args=args), self.assertRaises(ValueError):
                 derive(*args)
 
@@ -121,8 +118,13 @@ class Devices(unittest.TestCase):
 
     def test_beams_are_the_controllers_lines(self):
         lines = {b['name']: b for b in self.dev['beams']}
+        self.assertEqual(set(lines), {'beam_feed', 'beam_stop'})
+        for key in ('beam_in', 'beam_gangue'):
+            self.assertNotIn(key, ST)
+            for suffix in ('tx', 'rx', 'light', 'tx_post', 'rx_post'):
+                self.assertEqual(mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_GEOM, 'dev_%s_%s' % (key, suffix)), -1)
         self.assertEqual((lines['beam_feed']['x'], lines['beam_feed']['z']), (D['feeder']['beam']['x'], D['feeder']['beam']['z']))
-        for key in ('beam_in', 'beam_stop', 'beam_gangue'):
+        for key in ('beam_stop',):
             self.assertEqual((lines[key]['x'], lines[key]['z']), (ST[key]['x'], ST[key]['z']))
         for b in self.dev['beams']:
             self.assertEqual(b['max_block_s'], sensors.MAX_BLOCK_S[b['name']])
@@ -135,6 +137,12 @@ class Devices(unittest.TestCase):
                 c, s = self.d.geom_xpos[h], self.m.geom_size[h]
                 self.assertLess(c[2] - s[2], b['z'])                     # the lens height is inside the housing
                 self.assertLess(abs(abs(c[1] - y) - s[1]), 2e-4)         # the housing's face is on the line's end
+
+    def test_removed_beams_are_not_fault_targets(self):
+        for name in ('beam_in', 'beam_gangue'):
+            for kind in ('beam_dead', 'beam_dirty'):
+                with self.subTest(name=name, kind=kind), self.assertRaises(ValueError):
+                    parse_faults(dict(CFG, fault=['%s:%s@0' % (kind, name)]))
 
     def test_cameras_see_what_their_controllers_use(self):
         self.assertEqual([c['name'] for c in self.dev['cameras']],
@@ -370,7 +378,7 @@ class Line:
             self.see(boxes, **kw)
 
     def onto_measuring_belt(self, boxes, k=0, **kw):
-        """Lump k over the head edge, along B past S2 and S3 (M empty: no stop), across and wholly onto M."""
+        """Lump k over the head edge, along B past S3 (M empty: no stop), across and wholly onto M."""
         s = self.s
         boxes[k] = box(EDGE - .30, EDGE + .10)
         self.see(boxes, **kw)
@@ -406,7 +414,6 @@ class Control(unittest.TestCase):
         boxes = {0: self.far(0)}
         it = L.onto_measuring_belt(boxes)
         self.assertEqual((it['stage'], s.m_goal), ('measure', 0.))
-        self.assertEqual(it['handover']['interruptions'], 1)             # S2 saw it once
         self.assertEqual(it['reasons'], [])
         L.measure(boxes, it)
         self.assertEqual((it['route'], it['void'], it['steady']), ('coal', False, True))
@@ -460,7 +467,7 @@ class Control(unittest.TestCase):
     def test_lumps_drawn_apart_on_the_buffer_become_two_items(self):
         # two lumps go over the head edge as one blob (one item); B running at twice the main belt's speed pulls
         # the lead away while the other is still on the main belt. Drawn GROUP_GAP apart they become two items,
-        # and S2 confirms each hand-over with its own interruption -- none of it is void
+        # with each item's camera lineage retained -- none of it is void
         cfg = parse_config(['--no-video', '--buffer-len', '1.5', '--buffer-speed', '.8'])
         d = machine.derive(cfg)
         L = Line(cfg=cfg, d=d)
@@ -476,14 +483,13 @@ class Control(unittest.TestCase):
             boxes[0] = box(lead - .40, lead, top, top + .30)
             boxes[1] = box(rear - .40, rear, top, top + .30) if rear - .40 > edge else box(rear - .40, rear)
             L.see(boxes, lin={0: {100}, 1: {100}})
-            if rear - .40 > d['station']['beam_in']['x'] + .05:
+            if rear - .40 > edge + .70:
                 break
         L.see(boxes, lin={0: {100}, 1: {100}})
         self.assertEqual(len(s.items), 2)
         a, b = s.items
         self.assertEqual((a['split'], b['split_from'], s.counts['splits']), ([1], 0, 1))
         self.assertEqual((a['tids'], b['tids']), ({0}, {1}))
-        self.assertEqual((a['handover']['interruptions'], b['handover']['interruptions']), (1, 1))
         self.assertEqual((a['reasons'], b['reasons'], a['n_obj_max'], b['n_obj_max']), ([], [], 1, 1))
 
     def test_nothing_leaves_the_measuring_belt_before_it_is_measured(self):
@@ -555,22 +561,6 @@ class Control(unittest.TestCase):
         self.assertIn('implausible', it['reasons'])
         self.held(it)
 
-    def test_handover_needs_s2(self):
-        L = self.L
-        L.beams['beam_in'].fault = 'dead'
-        boxes = {0: self.far(0), 1: self.far(1)}
-        it = L.onto_measuring_belt(boxes)
-        self.assertEqual((it['reasons'], it['reason_info']['handover']['detail']), (['handover'], 'S2 saw nothing'))
-        L.measure(boxes, it)
-        self.held(it)
-        L.take_off([0])                                                # take it off: the second hand-over ...
-        del boxes[0]
-        it2 = L.onto_measuring_belt(boxes, k=1)
-        self.assertEqual((L.beams['beam_in'].alarm or {}).get('why'), 'dead')   # ... two in a row: S2 is dead
-        self.assertEqual(L.s.fault['reason'], 'beam_dead')
-        self.assertTrue(L.s.frozen)
-        self.assertIn('handover', it2['reasons'])
-
     def test_a_held_item_taken_off_frees_the_line(self):
         L, s = self.L, self.s
         boxes = {0: self.far(0), 1: self.far(1)}
@@ -607,7 +597,7 @@ class Control(unittest.TestCase):
         it2 = L.onto_measuring_belt(boxes, k=2)
         self.assertEqual(it2['stage'], 'measure')                       # M stops for it as usual
 
-    def test_gangue_plate_path_needs_s4_and_the_zone_camera(self):
+    def test_gangue_plate_path_needs_a_healthy_zone_camera(self):
         L, s = self.L, self.s
         boxes = {1: self.far(1)}
         it = L.onto_measuring_belt(boxes, k=1)
@@ -620,19 +610,21 @@ class Control(unittest.TestCase):
         boxes[1] = box(MEND + .03, MEND + .43, TOP - .10, TOP + .20)
         L.see(boxes, plate=SC.open_deg - .1)
         self.assertEqual((it['stage'], s.plate), ('sent', 'open'))
-        gz = ST['beam_gangue']['z']
-        boxes[1] = box(MEND + .05, MEND + .45, gz - .10, gz + .20)       # falling through the gap: S4 blocked
-        L.see(boxes, plate=SC.open_deg - .1)
-        L.see(boxes, plate=SC.open_deg - .1)
+        self.assertTrue(s.path_pending)
         stuck = box(MEND + .3, MEND + .7, ST['separator']['inlet'][2] - .2, ST['separator']['inlet'][2] + .1)
-        boxes[1] = stuck                                                # S4 clear again, but something is still in the zone
+        boxes[1] = stuck                                                # the camera still sees material in the zone
         for _ in range(50):
             L.see(boxes, plate=SC.open_deg - .1)
         self.assertNotIn('t_clear_s', it)
         self.assertEqual(s.plate, 'open')                               # the plate does not close on it
         del boxes[1]
+        L.see(boxes, plate=SC.open_deg - .1, health=False)
+        self.assertNotIn('t_clear_s', it)                               # no observations is not a clear zone
+        self.assertTrue(s.path_pending and s.frozen)
+        L.see(boxes, plate=SC.open_deg - .1)
         L.see(boxes, plate=SC.open_deg - .1, states=['on_belt', 'sorted', 'on_belt'], bins=[None, 'gangue', None])
-        self.assertEqual((it['path_confirmed_by'], s.plate), ('S4 + plate-zone camera', 'closing'))
+        self.assertEqual((it['path_confirmed_by'], s.plate), ('plate-zone camera', 'closing'))
+        self.assertFalse(s.path_pending)
 
     def test_plate_path_timeout_stops_the_line(self):
         L, s = self.L, self.s
@@ -645,7 +637,7 @@ class Control(unittest.TestCase):
                 break
         boxes[1] = box(MEND + .03, MEND + .43, TOP - .10, TOP + .20)
         L.see(boxes, plate=SC.open_deg - .1)
-        del boxes[1]                                                    # gone from view, S4 never saw it
+        boxes[1] = box(MEND + .3, MEND + .7, ST['separator']['inlet'][2] - .2, ST['separator']['inlet'][2] + .1)
         for _ in range(int(station.PATH_TIMEOUT_S / .01) + 5):
             L.see(boxes, plate=SC.open_deg - .1)
         self.assertEqual(s.fault['reason'], 'separator_path_timeout')
@@ -885,6 +877,7 @@ class Acceptance(unittest.TestCase):
         self.assertEqual((st['counts']['void'], st['counts']['landed'], st['counts']['route_not_as_ideal']), (0, 5, 0))
         self.assertEqual(st['verification'], dict(st['verification'], false_valid=[], false_void=[], landed_unmeasured=[]))
         self.assertLess(st['mass_error_pct_abs_max'], 1.)
+        self.assertTrue(all(it.get('path_confirmed_by') == 'plate-zone camera' for it in st['items']))
         self.assertEqual(r['outcome']['funnel']['max_lumps'], 1)
         self.assertTrue(r['numerics']['ok'])
         self.assertLess(r['perception']['vision']['centroid_error_m']['p95'], .04)

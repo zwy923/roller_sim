@@ -28,7 +28,7 @@ POST = .03                           # half section of a mast / gantry post
 CAMERA = dict(fovy=45., aspect=16 / 9)       # overhead cameras (1920 x 1080)
 LATENCY_S = .05                      # s: capture + processing; the controllers see the scene as it was this long ago
 # longest a lump can keep a beam blocked while the belt under it runs (longer: something is stuck), s
-MAX_BLOCK_S = dict(beam_feed=6., beam_in=6., beam_stop=6., beam_gangue=2.)
+MAX_BLOCK_S = dict(beam_feed=6., beam_stop=6.)
 DEPTH = dict(fovy=50., aspect=4 / 3)         # scanner heads
 
 
@@ -81,16 +81,10 @@ def layout(cfg, d):
                   x=fd['beam']['x'], z=fd['beam']['z'], y0=cfg['lane_y'] - T, y1=cfg['belt_w'] + T, post=False,
                   max_block_s=MAX_BLOCK_S['beam_feed'])]
     half = st['width_m'] / 2 + T
-    for key, role in (('beam_in', 'buffer belt entry: confirms each hand-over (interruptions and their length, checked '
-                                  'against the camera objects)'),
-                      ('beam_stop', 'buffer belt staging stop: the lead lump waits here while the measuring '
-                                    'belt is busy'),
-                      ('beam_gangue', 'gangue gap under the separator inlet: the gangue has dropped past it; the '
-                                      'plate may move once the plate camera also sees its zone empty')):
-        b = st[key]
-        gangue = key == 'beam_gangue'
-        beams.append(dict(name=key, role=role, x=b['x'], z=b['z'], y0=st['y_c'] - half - .03 * gangue,
-                          y1=st['y_c'] + half + .03 * gangue, post=gangue, max_block_s=MAX_BLOCK_S[key]))
+    b = st['beam_stop']
+    beams.append(dict(name='beam_stop', role='buffer belt staging stop: the lead lump waits here while the measuring '
+                     'belt is busy', x=b['x'], z=b['z'], y0=st['y_c'] - half, y1=st['y_c'] + half,
+                     post=False, max_block_s=MAX_BLOCK_S['beam_stop']))
     # ---- cameras -----------------------------------------------------------------------------------
     y_c, top, P0x, x_e = st['y_c'], st['top_z'], float(d['P0'][0]), st['buffer']['x0']
     m_end = st['measure']['x1']
