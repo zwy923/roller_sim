@@ -153,6 +153,10 @@ def work(arg):
         cfg['out_dir'] = Path(out) / job['config'] / job['tag']
         r = simulate.run(cfg, save=keep)
         s = summary(job, r, time.time() - t0)
+        if 'side_pusher' in r:
+            s['side_pusher'] = r['side_pusher']
+            s['entry_audit'] = r['entry_audit']
+            s['measurement_audit'] = r['measurement_audit']
         dest.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(dest.with_name(job['tag'] + '.result.json.gz'), 'wt', encoding='utf-8') as fh:
             json.dump(full['r'], fh, ensure_ascii=False)

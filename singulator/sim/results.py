@@ -129,6 +129,9 @@ def assemble(line, wall_s):
         taken_off=line.takeoff.log,
         scenario=dict(kind=cfg['scenario'], **line.scenario.info))
     out['measurement_audit'] = measurement_report(out)
+    if line.gate:
+        out['side_pusher'] = dict(line.gate.report(), drive=line.gate_drive.report())
+        out['entry_audit'] = line.entry_watch.report()
     return out
 
 
@@ -143,4 +146,5 @@ def write(cfg, out, xml, traj, drive_names):
                         pos=f32('pos'), quat=f32('quat'), com=f32('com'), touch=np.array(traj['touch'], np.uint16),
                         touch_categories=np.array(CATS), face_deg=f32('face_deg'),
                         face_contact_N=f32('face_contact_N'), drive_f=f32('drive_f'),
-                        drive_names=np.array(drive_names), weigh_N=f32('weigh_N'), sep_deg=f32('sep_deg'))
+                        drive_names=np.array(drive_names), weigh_N=f32('weigh_N'), sep_deg=f32('sep_deg'),
+                        **{k: f32(k) for k in ('gate_m', 'gate_buffer_m') if k in traj})

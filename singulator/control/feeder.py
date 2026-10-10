@@ -120,6 +120,7 @@ class Feeder:
         self.staging = False
         self.staged = False                             # the belt was run for staging since the last release stopped
         self.miss_streak = 0                            # released lumps in a row that passed the beam unseen
+        self.held = frozenset()                         # lumps the side gate retains (hold_back)
         # a lump that went has to cross the hand-over gap before it reaches the beam (dragged at about half the
         # main belt speed while its rear still rests on the head drum): the fallback waits that much longer
         hand = self.g.get('x_lower', self.g['x1']) - self.g['x1']
@@ -161,6 +162,18 @@ class Feeder:
         if self.releases and (self.releases[-1]['members'] or 't_first_s' in self.releases[-1]):
             self.miss_shift += held
         self.reader.forget()
+
+    # ---- the experimental side gate (control/side_gate.py) ------------------------------------------------------
+    def hold_back(self, lumps):
+        """The lumps the gate's plate retains now (true ids); the ideal view leads, stages and judges the funnel by
+        the others, the next to go. Empty: none held."""
+        self.held = frozenset(lumps)
+
+    def saw_beam(self):
+        """The drop beam was cut while the gate had the feed belt (this controller paused, so it did not read the
+        beam): the release's beam has seen its lump, for the dead-beam check."""
+        self.releases[-1]['beam_seen'] = True
+        self.miss_streak = 0
 
     def _stop(self, t, why):
         rel = self.releases[-1]
@@ -355,8 +368,12 @@ class _Ideal:
 
     queued = property(lambda self: bool(self.q))
 
+    def _next(self):
+        """The queued lumps that can go next: those the side gate does not retain (all of them, if it holds all)."""
+        return [k for k in self.q if k not in self.f.held] or self.q
+
     def lead(self):
-        return max(self.view[k]['cx'] for k in self.q)
+        return max(self.view[k]['cx'] for k in self._next())
 
     def went_lead(self, rel):
         """The leading centroid of the lumps this release has put over the edge (-inf before any)."""
@@ -424,7 +441,7 @@ class _Ideal:
 
     def funnel_clear(self):
         f, view = self.f, self.view
-        k = max(self.q, key=lambda j: view[j]['cx'])    # the next to go, by centroid
+        k = max(self._next(), key=lambda j: view[j]['cx'])  # the next to go, by centroid
         nose = float(view[k]['x1']) - view[k]['cx']     # its front ahead of its centroid
         return f._funnel_clear(((view[j], self._speed(j)) for j in f.released if j in view),
                                view[k]['cx'], f.g['x1'] + nose)

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="610" viewBox="0 0 1200 610">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#167c75"/></marker>
+  </defs>
+  <rect width="1200" height="610" fill="#f6f8fa"/>
+  <g font-family="Microsoft YaHei, sans-serif" fill="#183044">
+    <text x="40" y="48" font-size="27" font-weight="bold">侧向伸缩挡板：保留一侧，让另一侧先行</text>
+    <text x="40" y="80" font-size="17" fill="#596a78">俯视原理示意，非保存轨迹；适用于本轮 300–500 mm 模型</text>
+    <text x="42" y="125" font-size="21" font-weight="bold">① 判出并排，停带插入</text>
+    <text x="640" y="125" font-size="21" font-weight="bold">② 挡住相邻块，皮带送出一块</text>
+    <g stroke="#bac5cd" stroke-width="2">
+      <rect x="42" y="180" width="410" height="270" fill="#dcece6"/>
+      <rect x="452" y="180" width="100" height="270" fill="#e4e9ed"/>
+      <rect x="640" y="180" width="410" height="270" fill="#dcece6"/>
+      <rect x="1050" y="180" width="108" height="270" fill="#e4e9ed"/>
+    </g>
+    <g stroke="#8a959b" stroke-width="5">
+      <path d="M42 180H443 M42 450H443 M640 180H1041 M640 450H1041"/>
+    </g>
+    <g fill="#5c6266" stroke="#313d45" stroke-width="2">
+      <path d="M333 215L388 203L423 231L414 280L365 293L328 269Z"/>
+      <path d="M335 337L394 324L429 351L420 407L365 420L326 390Z"/>
+      <path d="M948 215L1003 203L1038 231L1029 280L980 293L943 269Z"/>
+      <path d="M1052 337L1111 324L1146 351L1137 407L1082 420L1043 390Z"/>
+    </g>
+    <g fill="#e99432" stroke="#b16b1b" stroke-width="2">
+      <rect x="456" y="145" width="9" height="150"/>
+      <rect x="456" y="468" width="9" height="92"/>
+      <rect x="1054" y="145" width="9" height="150"/>
+      <rect x="1054" y="468" width="9" height="92"/>
+    </g>
+    <g stroke="#167c75" stroke-width="4" fill="none" marker-end="url(#arrow)">
+      <path d="M130 310H263"/>
+      <path d="M725 373H870"/>
+      <path d="M493 149V235"/>
+    </g>
+    <g font-size="17">
+      <text x="113" y="340">给料方向</text>
+      <text x="495" y="171">伸入</text>
+      <text x="701" y="407">形成前后错位</text>
+      <text x="903" y="163">挡板 + 纵向弹簧缓冲</text>
+      <text x="82" y="482">绿色：给料带</text>
+      <text x="286" y="482">灰色：主带</text>
+      <text x="638" y="482">放行块过边 → 制动 → 退板 → 再判断</text>
+    </g>
+    <rect x="40" y="526" width="1090" height="58" rx="8" fill="#eaf0f5"/>
+    <text x="57" y="551" font-size="16">挡板高 280 mm，厚 24 mm，最大侧向行程 900 mm；纵向缓冲行程 30 mm。</text>
+    <text x="57" y="574" font-size="16" fill="#596a78">这些是未标定仿真参数；按真值判断并排，是上限，不是实物控制器。</text>
+  </g>
+</svg>

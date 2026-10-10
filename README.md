@@ -98,6 +98,8 @@ python experiments/analyze.py runs/batch --list           # 逐块审计
 
 各自检脚本可单独运行；跑批支持中断后用同一命令续跑。配对比较、放料审计和轨迹分析见 [实验脚本](experiments/README.md)，机头几何矩阵见 [交接小试](designs/transfer_trial/DESIGN.md)。
 
+可选的 [侧向伸缩挡板](designs/side_pusher/DESIGN.md) 默认关闭。`--side-pusher active --feeder-sensing oracle` 按真值挡住并排的煤块，是这套硬件上任何给料算法的上限（同一 300 批独立测量 1183 → 1199/1200），不是实物控制器。
+
 ## 目录导航
 
 | 入口 | 内容 |

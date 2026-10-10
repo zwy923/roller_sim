@@ -11,16 +11,16 @@ import math
 
 import numpy as np
 
-from . import feed_belt, plough, sensors, separator, station
+from . import feed_belt, plough, sensors, separator, side_gate, station
 from .parts import SKIRT, f3
 
 LUMP_BODY, LUMP_JOINT, LUMP_GEOM, LUMP_MESH = 'b%d', 'bj%d', 'bg%d', 'blk%d'
 
 # contact categories, by the equipment a lump touches (bit i of trajectory.npz 'touch' = CATS[i]): 'belt' is the
 # feed and main belts, 'buffer' the buffer belt with its skirts, 'weigher' the measuring belt with its (the weigh
-# frame), 'device' the sensor hardware (machine/sensors.py)
+# frame), 'device' the sensor hardware (machine/sensors.py), 'pusher' the side gate's plates (machine/side_gate.py)
 CATS = ('other', 'belt', 'plough', 'block', 'skirt', 'lane_wall', 'side_belt', 'buffer', 'weigher',
-        'separator', 'device')
+        'separator', 'device', 'pusher')
 
 
 def build_xml(cfg, d, blocks):
@@ -45,9 +45,14 @@ def build_xml(cfg, d, blocks):
                     '<geom name="bg%d" class="rock" type="mesh" mesh="blk%d" density="%.12g" rgba="%s"/></body>'
                     % (k, -6 - 1.2 * k, k, k, k, b['density'], f3(rgba)))
     assets = ['<mesh name="blk%d" vertex="%s"/>' % (k, f3(b['vertices'].ravel())) for k, b in enumerate(blocks)]
+    gate_actuators = ''
+    if cfg['side_pusher'] != 'off':
+        gate_bodies, gate_actuators = side_gate.hardware(cfg, d)
+        body += gate_bodies
 
     # ---- fixed geoms ---------------------------------------------------------------------------------------
-    static = plough.lane_wall(cfg, d) + plough.skirts(cfg, d) + station.skirts(st)
+    side_skirts = plough.skirts(cfg, d) if cfg['side_pusher'] == 'off' else side_gate.skirts(cfg, d)
+    static = plough.lane_wall(cfg, d) + side_skirts + station.skirts(st)
     # the floor the separator stands on catches everything (no bins modelled)
     static.append('<geom name="floor" class="equip" type="plane" size="30 30 .1" pos="1 .5 %.4f" material="grid"/>'
                   % st['separator']['floor_z'])
@@ -87,7 +92,7 @@ def build_xml(cfg, d, blocks):
     {chr(10).join(static)}
     {chr(10).join(body)}
   </worldbody>
-<equality>{sep_equality}</equality><actuator>{face_actuator + sep_actuator}</actuator></mujoco>"""
+<equality>{sep_equality}</equality><actuator>{face_actuator + sep_actuator + gate_actuators}</actuator></mujoco>"""
 
 
 def categorise(model):
@@ -118,6 +123,8 @@ def categorise(model):
             cat[g] = 9
         elif gname.startswith('dev_'):
             cat[g] = 10
+        elif gname.startswith('push_'):
+            cat[g] = 11
     return cat
 
 

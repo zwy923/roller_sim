@@ -94,6 +94,18 @@ PARAMS = {
           "(3 mm) past the edge and the lump tips on its own (S8, docs/TODO.md section 1). 'centroid' needs the true "
           "centroid: on the camera path (--feeder-sensing vision) the beam ends the release whatever this says"),
     ],
+    'experimental side gate (designs/side_pusher/)': [
+        P('side_pusher', 'off', ('off', 'parked', 'active'),
+          'transverse sliding hold-back plates at the feed head. off: original machine; parked/active: identical '
+          'retrofit hardware, disabled/enabled control. active plans from the true lumps (needs --feeder-sensing '
+          'oracle): the upper bound of any feeding algorithm on this hardware, not a controller for the real machine'),
+        P('gate_height', .28, float, 'side gate plate height, m; uncalibrated prototype'),
+        P('gate_stroke', .90, float, 'maximum lateral gate travel, m'),
+        P('gate_speed', .50, float, 'gate reference speed, m/s'),
+        P('gate_force_max', 1000., float, 'gate lateral actuator force limit, N'),
+        P('gate_load_trip', 2500., float, 'assumed gate load-cell contact force trip, N'),
+        P('pusher_max_actions', 10, int, 'maximum gate actions per batch'),
+    ],
     'main belt, plough face, lane': [
         P('belt_w', 1.2, float, 'clear belt width the stream arrives on'),
         P('v_belt', .40, float, 'main belt speed, m/s'),
@@ -302,7 +314,8 @@ def validate(cfg):
                 'size_min', 'size_max', 'size_long_max', 'belt_force_max',
                 'side_belt_force_max', 'face_force_max', 'face_swing_s',
                 'jam_window', 'feed_len', 'solver_tolerance', 'penetration_limit',
-                'face_kp', 'face_kv', 'face_carrier_mass', 'face_position_tol', 'face_velocity_tol')
+                'face_kp', 'face_kv', 'face_carrier_mass', 'face_position_tol', 'face_velocity_tol',
+                'gate_height', 'gate_stroke', 'gate_speed', 'gate_force_max', 'gate_load_trip')
     nonnegative = ('friction_belt', 'friction_steel', 'friction_block', 'ramp',
                    'jam_speed', 'torsional_friction', 'rolling_friction',
                    'feed_drop_height', 'face_bearing_drag')
@@ -338,4 +351,10 @@ def validate(cfg):
         raise ValueError('dt must divide the 10 ms controller interval exactly')
     if not 0 < abs(c['face_swing_deg']) < 90:
         raise ValueError('face_swing_deg must have a nonzero magnitude below 90 degrees')
+    if c['gate_stroke'] >= c['belt_w'] - c['lane_y']:
+        raise ValueError('gate_stroke must be less than the belt width beside the lane (belt_w - lane_y)')
+    if c['side_pusher'] == 'active' and 'oracle' not in (c['sensing'], c['feeder_sensing']):
+        raise ValueError('--side-pusher active plans from the true lumps: it needs --feeder-sensing oracle')
+    if c['pusher_max_actions'] < 0:
+        raise ValueError('pusher_max_actions must be nonnegative')
     return cfg
